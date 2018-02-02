@@ -266,101 +266,65 @@ pub const Compiler = struct {
             // TODO: Have an assert instruction (empty-match) which does the check and doesn't
             // advance the thread if it fails.
             Expr.BeginLine, Expr.EndLine => {
-                @panic("unhandled");
+                @panic("unhandled ^, $ assertions");
             },
             Expr.Repeat => |repeat| {
                 // Case 1: *
                 if (repeat.min == 0 and repeat.max == null) {
-                    // 1: split 2, 4
-                    // 2: subexpr
-                    // 3: jmp 1
-                    // 4: ...
-
-                    // We do not know where the second branch in this split will go (unsure yet of
-                    // the length of the following subexpr. Need a hole.
-
-                    // Create a partial instruction with a hole outgoing at the current location.
-                    const entry = c.insts.len;
-
-                    // * or *? variant, simply switch the branches, the matcher manages precedence
-                    // of the executing threads.
-                    const partial_inst =
-                        if (repeat.greedy)
-                            InstHole { .Split1 = c.insts.len + 1 }
-                        else
-                            InstHole { .Split2 = c.insts.len + 1 }
-                        ;
-
-                    const h = try c.push_hole(partial_inst);
-
-                    // compile the subexpression
-                    const p = try c.compile_internal(repeat.subexpr);
-
-                    // sub-expression to jump
-                    c.fill_to_next(p.hole);
-
-                    // Jump back to the entry split
-                    try c.push_compiled(Inst { .Jump = entry });
-
-                    // Return a filled patch set to the first split instruction.
-                    return Patch { .hole = h, .entry = entry };
+                    return c.compile_star(repeat.subexpr, repeat.greedy);
                 }
                 // Case 2: +
                 else if (repeat.min == 1 and repeat.max == null) {
-                    // 1: subexpr
-                    // 2: split 1, 3
-                    // 3: ...
-                    //
-                    // NOTE: We can do a lookahead on non-greedy here to improve performance.
-                    const p = try c.compile_internal(repeat.subexpr);
-
-                    // Create the next expression in place
-                    c.fill_to_next(p.hole);
-
-                    // split 3, 1 (non-greedy)
-                    // Point back to the upcoming next instruction (will always be filled).
-                    const partial_inst =
-                        if (repeat.greedy)
-                            InstHole { .Split1 = p.entry }
-                        else
-                            InstHole { .Split2 = p.entry }
-                        ;
-
-                    const h = try c.push_hole(partial_inst);
-
-                    // split to the next instruction
-                    return Patch { .hole = h, .entry = p.entry };
+                    return c.compile_plus(repeat.subexpr, repeat.greedy);
                 }
                 // Case 3: ?
                 else if (repeat.min == 0 and repeat.max != null and (??repeat.max) == 1) {
-                    // 1: split 2, 3
-                    // 2: subexpr
-                    // 3: ...
-
-                    // Create a partial instruction with a hole outgoing at the current location.
-                    const partial_inst =
-                        if (repeat.greedy)
-                            InstHole { .Split1 = c.insts.len + 1 }
-                        else
-                            InstHole { .Split2 = c.insts.len + 1 }
-                        ;
-
-                    const h = try c.push_hole(partial_inst);
-
-                    // compile the subexpression
-                    const p = try c.compile_internal(repeat.subexpr);
-
-                    var holes = ArrayList(Hole).init(c.allocator);
-                    errdefer holes.deinit();
-                    try holes.append(h);
-                    try holes.append(p.hole);
-
-                    // Return a filled patch set to the first split instruction.
-                    return Patch { .hole = Hole { .Many = holes }, .entry = p.entry - 1 };
+                    return c.compile_question(repeat.subexpr, repeat.greedy);
                 }
-                // Case 3: {m,n} etc
+                // Case 4: {m,}
+                else if (repeat.max == null) {
+                    // e{2,} => eee*
+
+                    // fixed min concatenation
+                    const p = try c.compile_internal(repeat.subexpr);
+                    var hole = p.hole;
+                    const entry = p.entry;
+
+                    var i: usize = 0;
+                    while (i < repeat.min) : (i += 1) {
+                        const ep = try c.compile_internal(repeat.subexpr);
+                        c.fill(hole, ep.entry);
+                        hole = ep.hole;
+                    }
+
+                    // add final e* infinite capture
+                    const st = try c.compile_star(repeat.subexpr, repeat.greedy);
+                    c.fill(hole, st.entry);
+
+                    return Patch { .hole = st.hole, .entry = entry };
+                }
+                // Case 5: {m,n} and {m}
                 else {
-                    @panic("unimplemented {m,n} case");
+                    // e{3,6} => eee?e?e?e?
+                    const p = try c.compile_internal(repeat.subexpr);
+                    var hole = p.hole;
+                    const entry = p.entry;
+
+                    var i: usize = 1;
+                    while (i < repeat.min) : (i += 1) {
+                        const ep = try c.compile_internal(repeat.subexpr);
+                        c.fill(hole, ep.entry);
+                        hole = ep.hole;
+                    }
+
+                    // repeated optional concatenations
+                    while (i < ??repeat.max) : (i += 1) {
+                        const ep = try c.compile_question(repeat.subexpr, repeat.greedy);
+                        c.fill(hole, ep.entry);
+                        hole = ep.hole;
+                    }
+
+                    return Patch { .hole = hole, .entry = entry };
                 }
             },
             Expr.Concat => |subexprs| {
@@ -447,6 +411,98 @@ pub const Compiler = struct {
     }
 
     ////////////////////
+    // Compile Helpers
+    fn compile_star(c: &Compiler, expr: &Expr, greedy: bool) %Patch {
+        // 1: split 2, 4
+        // 2: subexpr
+        // 3: jmp 1
+        // 4: ...
+
+        // We do not know where the second branch in this split will go (unsure yet of
+        // the length of the following subexpr. Need a hole.
+
+        // Create a partial instruction with a hole outgoing at the current location.
+        const entry = c.insts.len;
+
+        // * or *? variant, simply switch the branches, the matcher manages precedence
+        // of the executing threads.
+        const partial_inst =
+            if (greedy)
+                InstHole { .Split1 = c.insts.len + 1 }
+            else
+                InstHole { .Split2 = c.insts.len + 1 }
+            ;
+
+        const h = try c.push_hole(partial_inst);
+
+        // compile the subexpression
+        const p = try c.compile_internal(expr);
+
+        // sub-expression to jump
+        c.fill_to_next(p.hole);
+
+        // Jump back to the entry split
+        try c.push_compiled(Inst { .Jump = entry });
+
+        // Return a filled patch set to the first split instruction.
+        return Patch { .hole = h, .entry = entry };
+    }
+
+    fn compile_plus(c: &Compiler, expr: &Expr, greedy: bool) %Patch {
+        // 1: subexpr
+        // 2: split 1, 3
+        // 3: ...
+        //
+        // NOTE: We can do a lookahead on non-greedy here to improve performance.
+        const p = try c.compile_internal(expr);
+
+        // Create the next expression in place
+        c.fill_to_next(p.hole);
+
+        // split 3, 1 (non-greedy)
+        // Point back to the upcoming next instruction (will always be filled).
+        const partial_inst =
+            if (greedy)
+                InstHole { .Split1 = p.entry }
+            else
+                InstHole { .Split2 = p.entry }
+            ;
+
+        const h = try c.push_hole(partial_inst);
+
+        // split to the next instruction
+        return Patch { .hole = h, .entry = p.entry };
+    }
+
+    fn compile_question(c: &Compiler, expr: &Expr, greedy: bool) %Patch {
+        // 1: split 2, 3
+
+        // 2: subexpr
+        // 3: ...
+
+        // Create a partial instruction with a hole outgoing at the current location.
+        const partial_inst =
+            if (greedy)
+                InstHole { .Split1 = c.insts.len + 1 }
+            else
+                InstHole { .Split2 = c.insts.len + 1 }
+            ;
+
+        const h = try c.push_hole(partial_inst);
+
+        // compile the subexpression
+        const p = try c.compile_internal(expr);
+
+        var holes = ArrayList(Hole).init(c.allocator);
+        errdefer holes.deinit();
+        try holes.append(h);
+        try holes.append(p.hole);
+
+        // Return a filled patch set to the first split instruction.
+        return Patch { .hole = Hole { .Many = holes }, .entry = p.entry - 1 };
+    }
+
+    ////////////////////
     // Instruction Helpers
 
     // Push a compiled instruction directly onto the stack.
@@ -483,7 +539,7 @@ pub const Compiler = struct {
 };
 
 test "compile" {
-    const a = "abc+de+.ab*(cc|de)";
+    const a = "a{3,}b{4}c{3,4}";
     debug.warn("\n{}\n", a);
 
     var p = Parser.init(debug.global_allocator);
