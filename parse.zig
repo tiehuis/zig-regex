@@ -1,5 +1,30 @@
+// Supported constructs:
+//
+// [x] .
+// [x] [xyz]
+// [ ] [^xyz]
+// [ ] \d
+// [ ] \D
+// [ ] [[:alpha:]]
+// [ ] [[:^alpha:]]
+// [ ] unicode
+// [x] (axyz)
+// [x] xy
+// [x] x|y
+// [x] x* (?)
+// [x] x+ (?)
+// [x] x? (?)
+// [x] x{n,m} (?)
+// [x] x{n,} (?)
+// [x] ^
+// [x] $
+// [ ] \A
+// [ ] \b
+// [ ] escape sequences
+
 const std = @import("std");
 const mem = std.mem;
+const fmt = std.fmt;
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const debug = std.debug;
@@ -119,6 +144,11 @@ error UnopenedParentheses;
 error EmptyCaptureGroup;
 error UnmatchedCharClass;
 error StackUnderflow;
+error InvalidRepeatRange;
+error UnclosedRepeat;
+error ExcessiveRepeatCount;
+
+const repeat_max_length = 1000;
 
 /// Parser manages the parsing state and converts a regular expression string into an expression tree.
 ///
@@ -231,6 +261,67 @@ pub const Parser = struct {
                         .subexpr = try p.popCharClass(),
                         .min = 0,
                         .max = 1,
+                        .greedy = greedy,
+                    };
+
+                    var r = try p.createExpr();
+                    *r = Expr { .Repeat = repeat };
+                    try p.stack.append(r);
+                },
+                // TODO: Add some parsing/iteration helpers as this is ugly and does not
+                // handle early ending strings.
+                '{' => {
+                    i += 1;
+                    while (re[i] == ' ') i += 1;
+
+                    const start = i;
+                    while ('0' <= re[i] and re[i] <= '9') i += 1;
+
+                    const min = try fmt.parseUnsigned(usize, re[start..i], 10);
+                    var max: ?usize = min;
+
+                    while (re[i] == ' ') i += 1;
+                    if (re[i] == ',') {
+                        i += 1;
+                        while (re[i] == ' ') i += 1;
+
+                        // {m,} case with infinite upper bound
+                        if (re[i] == '}') {
+                            max = null;
+                        }
+                        // {m,n} case with explicit bounds
+                        else {
+                            const start2 = i;
+                            while ('0' <= re[i] and re[i] <= '9') i += 1;
+                            max = try fmt.parseUnsigned(usize, re[start2..i], 10);
+
+                            if (??max < min) {
+                                return error.InvalidRepeatRange;
+                            }
+                        }
+                    }
+
+                    while (re[i] == ' ') i += 1;
+                    if (re[i] != '}') {
+                        return error.UnclosedRepeat;
+                    }
+
+                    // We limit repeat counts to overoad arbitrary memory blowup during compilation
+                    if (min > repeat_max_length or max != null and ??max > repeat_max_length) {
+                        return error.ExcessiveRepeatCount;
+                    }
+
+                    var greedy = true;
+                    if (i + 1 < re.len and re[i + 1] == '?') {
+                        greedy = false;
+                        i += 1;
+                    }
+
+                    // construct the repeat
+                    const repeat = Repeater {
+                        .subexpr = try p.popCharClass(),
+                        .min = min,
+                        .max = max,
                         .greedy = greedy,
                     };
 
@@ -473,7 +564,7 @@ pub const Parser = struct {
 
 test "parse" {
     var p = Parser.init(debug.global_allocator);
-    const a = "^abc(def)[a-e0-9](asd|er)+?$";
+    const a = "^abc(def)[a-e0-9](asd|er)+a{5}b{90,}c{90,1000}?$";
     const expr = try p.parse(a);
 
     debug.warn("\n");
