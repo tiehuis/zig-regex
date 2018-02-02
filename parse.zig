@@ -6,8 +6,22 @@ const debug = std.debug;
 
 /// A character class (e.g. [a-z] or [0-9]).
 pub const ClassRange = struct {
+    // Lower range in class (min <= max)
     min: u8,
+    // Upper range in class
     max: u8,
+};
+
+/// Repeat sequence (i.e. +, *, ?, {m,n})
+pub const Repeater = struct {
+    // The sub-expression to repeat
+    subexpr: &Expr,
+    // Lower number of times to match
+    min: usize,
+    // Upper number of times to match (null => infinite)
+    max: ?usize,
+    // Whether we match greedily
+    greedy: bool,
 };
 
 /// Represents a single node in an AST.
@@ -22,12 +36,8 @@ pub const Expr = union(enum) {
     EndLine,
     // Capture group
     Capture: &Expr,
-    // *
-    Star: &Expr,
-    // +
-    Plus: &Expr,
-    // ?
-    Question: &Expr,
+    // *, +, ?
+    Repeat: Repeater,
     // Character class [a-z&&0-9]
     // NOTE: We don't handle the && union just yet.
     CharClass: ArrayList(ClassRange),
@@ -68,22 +78,14 @@ pub const Expr = union(enum) {
             Expr.Literal => |lit| {
                 debug.warn("{}({c})\n", @tagName(*e), lit);
             },
-            // TODO: Can we get better type unification on enum variants with the same type?
-            Expr.Star => |subexpr| {
-                debug.warn("{}\n", @tagName(*e));
-                subexpr.dumpIndent(indent + 1);
-            },
             Expr.Capture => |subexpr| {
                 debug.warn("{}\n", @tagName(*e));
                 subexpr.dumpIndent(indent + 1);
             },
-            Expr.Plus => |subexpr| {
-                debug.warn("{}\n", @tagName(*e));
-                subexpr.dumpIndent(indent + 1);
-            },
-            Expr.Question => |subexpr| {
-                debug.warn("{}\n", @tagName(*e));
-                subexpr.dumpIndent(indent + 1);
+            Expr.Repeat => |repeat| {
+                debug.warn("{} (min={}, max={}, greedy={})\n",
+                    @tagName(*e), repeat.min, repeat.max, repeat.greedy);
+                repeat.subexpr.dumpIndent(indent + 1);
             },
             Expr.CharClass => |ranges| {
                 debug.warn("{}(", @tagName(*e));
@@ -91,6 +93,7 @@ pub const Expr = union(enum) {
                     debug.warn("[{c}-{c}]", r.min, r.max);
                 debug.warn(")\n");
             },
+            // TODO: Can we get better type unification on enum variants with the same type?
             Expr.Concat => |subexprs| {
                 debug.warn("{}\n", @tagName(*e));
                 for (subexprs.toSliceConst()) |s|
@@ -181,19 +184,40 @@ pub const Parser = struct {
 
         while (i < re.len) : (i += 1) {
             switch (re[i]) {
-                '+' => {
+                '*' => {
+                    const repeat = Repeater {
+                        .subexpr = try p.popCharClass(),
+                        .min = 0,
+                        .max = null,
+                        .greedy = true,
+                    };
+
                     var r = try p.createExpr();
-                    *r = Expr { .Plus = try p.popCharClass() };
+                    *r = Expr { .Repeat = repeat };
+                    try p.stack.append(r);
+                },
+                '+' => {
+                    const repeat = Repeater {
+                        .subexpr = try p.popCharClass(),
+                        .min = 1,
+                        .max = null,
+                        .greedy = true,
+                    };
+
+                    var r = try p.createExpr();
+                    *r = Expr { .Repeat = repeat };
                     try p.stack.append(r);
                 },
                 '?' => {
+                    const repeat = Repeater {
+                        .subexpr = try p.popCharClass(),
+                        .min = 0,
+                        .max = 1,
+                        .greedy = true,
+                    };
+
                     var r = try p.createExpr();
-                    *r = Expr { .Question = try p.popCharClass() };
-                    try p.stack.append(r);
-                },
-                '*' => {
-                    var r = try p.createExpr();
-                    *r = Expr { .Star = try p.popCharClass() };
+                    *r = Expr { .Repeat = repeat };
                     try p.stack.append(r);
                 },
                 '.' => {
