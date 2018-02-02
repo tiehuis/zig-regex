@@ -83,7 +83,7 @@ pub const Expr = union(enum) {
                 subexpr.dumpIndent(indent + 1);
             },
             Expr.Repeat => |repeat| {
-                debug.warn("{} (min={}, max={}, greedy={})\n",
+                debug.warn("{}(min={}, max={}, greedy={})\n",
                     @tagName(*e), repeat.min, repeat.max, repeat.greedy);
                 repeat.subexpr.dumpIndent(indent + 1);
             },
@@ -185,11 +185,17 @@ pub const Parser = struct {
         while (i < re.len) : (i += 1) {
             switch (re[i]) {
                 '*' => {
+                    var greedy = true;
+                    if (i + 1 < re.len and re[i + 1] == '?') {
+                        greedy = false;
+                        i += 1;
+                    }
+
                     const repeat = Repeater {
                         .subexpr = try p.popCharClass(),
                         .min = 0,
                         .max = null,
-                        .greedy = true,
+                        .greedy = greedy,
                     };
 
                     var r = try p.createExpr();
@@ -197,11 +203,17 @@ pub const Parser = struct {
                     try p.stack.append(r);
                 },
                 '+' => {
+                    var greedy = true;
+                    if (i + 1 < re.len and re[i + 1] == '?') {
+                        greedy = false;
+                        i += 1;
+                    }
+
                     const repeat = Repeater {
                         .subexpr = try p.popCharClass(),
                         .min = 1,
                         .max = null,
-                        .greedy = true,
+                        .greedy = greedy,
                     };
 
                     var r = try p.createExpr();
@@ -209,11 +221,17 @@ pub const Parser = struct {
                     try p.stack.append(r);
                 },
                 '?' => {
+                    var greedy = true;
+                    if (i + 1 < re.len and re[i + 1] == '?') {
+                        greedy = false;
+                        i += 1;
+                    }
+
                     const repeat = Repeater {
                         .subexpr = try p.popCharClass(),
                         .min = 0,
                         .max = 1,
-                        .greedy = true,
+                        .greedy = greedy,
                     };
 
                     var r = try p.createExpr();
@@ -333,7 +351,6 @@ pub const Parser = struct {
 
                     // TODO: Handle the empty alternation (||) case?
                     // TODO: Special-case length one.
-                    // TODO: Infinite loop causing oom.
                     while (true) {
                         // would underflow, push a new alternation
                         if (p.stack.len == 0) {
@@ -456,7 +473,7 @@ pub const Parser = struct {
 
 test "parse" {
     var p = Parser.init(debug.global_allocator);
-    const a = "^abc(def)[a-e0-9](asd|er)+$";
+    const a = "^abc(def)[a-e0-9](asd|er)+?$";
     const expr = try p.parse(a);
 
     debug.warn("\n");

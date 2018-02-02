@@ -249,7 +249,6 @@ pub const Compiler = struct {
     }
 
     fn compile_internal(c: &Compiler, expr: &const Expr) %Patch {
-        // TODO: Every instruction needs to return a hole to the next to handle alternations okay.
         switch (*expr) {
             Expr.Literal => |lit| {
                 const h = try c.push_hole(InstHole { .Char = lit });
@@ -269,7 +268,6 @@ pub const Compiler = struct {
             Expr.BeginLine, Expr.EndLine => {
                 @panic("unhandled");
             },
-            // TODO: Parsing and compiling of non-greedy variants (these are greedy by default).
             Expr.Repeat => |repeat| {
                 // Case 1: *
                 if (repeat.min == 0 and repeat.max == null) {
@@ -283,7 +281,17 @@ pub const Compiler = struct {
 
                     // Create a partial instruction with a hole outgoing at the current location.
                     const entry = c.insts.len;
-                    const h = try c.push_hole(InstHole { .Split1 = c.insts.len + 1 });
+
+                    // * or *? variant, simply switch the branches, the matcher manages precedence
+                    // of the executing threads.
+                    const partial_inst =
+                        if (repeat.greedy)
+                            InstHole { .Split1 = c.insts.len + 1 }
+                        else
+                            InstHole { .Split2 = c.insts.len + 1 }
+                        ;
+
+                    const h = try c.push_hole(partial_inst);
 
                     // compile the subexpression
                     const p = try c.compile_internal(repeat.subexpr);
@@ -311,7 +319,14 @@ pub const Compiler = struct {
 
                     // split 3, 1 (non-greedy)
                     // Point back to the upcoming next instruction (will always be filled).
-                    const h = try c.push_hole(InstHole { .Split1 = p.entry });
+                    const partial_inst =
+                        if (repeat.greedy)
+                            InstHole { .Split1 = p.entry }
+                        else
+                            InstHole { .Split2 = p.entry }
+                        ;
+
+                    const h = try c.push_hole(partial_inst);
 
                     // split to the next instruction
                     return Patch { .hole = h, .entry = p.entry };
@@ -323,7 +338,14 @@ pub const Compiler = struct {
                     // 3: ...
 
                     // Create a partial instruction with a hole outgoing at the current location.
-                    const h = try c.push_hole(InstHole { .Split1 = c.insts.len + 1 });
+                    const partial_inst =
+                        if (repeat.greedy)
+                            InstHole { .Split1 = c.insts.len + 1 }
+                        else
+                            InstHole { .Split2 = c.insts.len + 1 }
+                        ;
+
+                    const h = try c.push_hole(partial_inst);
 
                     // compile the subexpression
                     const p = try c.compile_internal(repeat.subexpr);
@@ -404,9 +426,6 @@ pub const Compiler = struct {
 
                     // store outgoing hole for the subexpression
                     try holes.append(p.hole);
-
-                    // TODO: Need a jump at the end of this. This should be done in the literal
-                    // return value and we can just take the p.hole return.
                 }
 
                 // one entry left, push a sub-expression so we end with a double-subexpression.
