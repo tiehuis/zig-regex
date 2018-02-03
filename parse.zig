@@ -172,8 +172,8 @@ pub const Parser = struct {
     pub fn deinit(p: &Parser) void {
         p.stack.deinit();
 
-        for (p.node_list) |node| {
-            p.allocator.free(node);
+        for (p.node_list.toSliceConst()) |node| {
+            p.allocator.destroy(node);
         }
     }
 
@@ -181,7 +181,7 @@ pub const Parser = struct {
         p.stack.shrink(0);
 
         for (p.node_list) |node| {
-            p.allocator.free(node);
+            p.allocator.destroy(node);
         }
         p.node_list.shrink(0);
     }
