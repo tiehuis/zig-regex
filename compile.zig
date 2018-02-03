@@ -222,6 +222,10 @@ pub const Compiler = struct {
         };
     }
 
+    pub fn deinit(c: &Compiler) void {
+        c.insts.deinit();
+    }
+
     // Compile the regex expression
     pub fn compile(c: &Compiler, expr: &const Expr) %Prog {
         const patch = try c.compile_internal(expr);

@@ -1,3 +1,28 @@
+// Supported constructs:
+//
+// [x] .
+// [x] [xyz]
+// [ ] [^xyz]
+// [ ] \d
+// [ ] \D
+// [ ] [[:alpha:]]
+// [ ] [[:^alpha:]]
+// [ ] unicode
+// [x] (axyz)
+// [x] xy
+// [x] x|y
+// [x] x* (?)
+// [x] x+ (?)
+// [x] x? (?)
+// [x] x{n,m} (?)
+// [x] x{n,} (?)
+// [x] ^
+// [x] $
+// [ ] \A
+// [ ] \b
+// [ ] escape sequences
+
+
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const debug = std.debug;
@@ -13,7 +38,9 @@ const Prog = compile.Prog;
 const Inst = compile.Inst;
 const VmBacktrack = exec.VmBacktrack;
 
-const Regex = struct {
+pub const Regex = struct {
+    // Manages the prog state (TODO: Just store allocator in Prog)
+    compiler: Compiler,
     // A compiled set of instructions
     compiled: Prog,
     // Which engine we are using, have a literal matcher engine too
@@ -30,6 +57,7 @@ const Regex = struct {
         errdefer c.deinit();
 
         return Regex {
+            .compiler = c,
             .compiled = try c.compile(expr),
             .engine = VmBacktrack{},
         };
@@ -45,13 +73,14 @@ const Regex = struct {
         errdefer c.deinit();
 
         return Regex {
+            .compiler = c,
             .compiled = c.compile(expr) catch unreachable,
             .engine = VmBacktrack{},
         };
     }
 
     pub fn deinit(re: &Regex) void {
-        re.compiled.deinit();
+        re.compiler.deinit();
     }
 
     // does the regex match the entire input string? simply run through from the first position.
@@ -74,7 +103,7 @@ const Regex = struct {
 test "regex" {
     var alloc = debug.global_allocator;
 
-    var re = Regex.mustCompile(alloc, "abc+d+.?");
+    var re = Regex.mustCompile(alloc, "ab{1}c+d+.?");
 
     debug.assert((try re.match("abcd")) == true);
     debug.assert((try re.match("abcccccd")) == true);

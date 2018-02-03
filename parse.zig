@@ -1,27 +1,3 @@
-// Supported constructs:
-//
-// [x] .
-// [x] [xyz]
-// [ ] [^xyz]
-// [ ] \d
-// [ ] \D
-// [ ] [[:alpha:]]
-// [ ] [[:^alpha:]]
-// [ ] unicode
-// [x] (axyz)
-// [x] xy
-// [x] x|y
-// [x] x* (?)
-// [x] x+ (?)
-// [x] x? (?)
-// [x] x{n,m} (?)
-// [x] x{n,} (?)
-// [x] ^
-// [x] $
-// [ ] \A
-// [ ] \b
-// [ ] escape sequences
-
 const std = @import("std");
 const mem = std.mem;
 const fmt = std.fmt;
