@@ -6,7 +6,7 @@ const debug = std.debug;
 
 const parser = @import("parse.zig");
 const Parser = parser.Parser;
-const ClassRange = parser.ClassRange;
+const ByteClass = parser.ByteClass;
 const Expr = parser.Expr;
 
 const InstSplit = struct {
@@ -19,9 +19,9 @@ const InstChar = struct {
     c: u8,
 };
 
-const InstRange = struct {
+const InstByteClass = struct {
     goto1: usize,
-    ranges: ArrayList(ClassRange),
+    class: ByteClass,
 };
 
 const InstJump = struct {
@@ -34,7 +34,7 @@ pub const Inst = union(enum) {
     Char: InstChar,
 
     // Match the specified character ranges.
-    CharRange: InstRange,
+    ByteClass: InstByteClass,
 
     // Matches the AnyChar special cases
     AnyCharNotNL: InstJump,
@@ -53,9 +53,9 @@ pub const Inst = union(enum) {
             Inst.Char => |x| {
                 debug.warn("char {}, '{c}'\n", x.goto1, x.c);
             },
-            Inst.CharRange => |x| {
+            Inst.ByteClass => |x| {
                 debug.warn("range {}, ", x.goto1);
-                for (x.ranges.toSliceConst()) |r|
+                for (x.class.ranges.toSliceConst()) |r|
                     debug.warn("[{c}-{c}]", r.min, r.max);
                 debug.warn("\n");
             },
@@ -80,7 +80,7 @@ const InstHole = union(enum) {
     // Match with an unfilled output
     Char: u8,
     // Match a character class range
-    Range: ArrayList(ClassRange),
+    ByteClass: ByteClass,
     // Match any character
     AnyCharNotNL,
     // Split with no unfilled branch
@@ -96,9 +96,9 @@ const InstHole = union(enum) {
             InstHole.Char => |ch| {
                 debug.warn("('{c}')\n", ch);
             },
-            InstHole.Range => |rs| {
+            InstHole.ByteClass => |x| {
                 debug.warn("(");
-                for (rs.toSliceConst()) |r|
+                for (x.ranges.toSliceConst()) |r|
                     debug.warn("[{c}-{c}]", r.min, r.max);
                 debug.warn(")\n");
             },
@@ -140,8 +140,8 @@ const PartialInst = union(enum) {
                     InstHole.AnyCharNotNL => {
                         comp = Inst { .AnyCharNotNL = InstJump { .goto1 = i }};
                     },
-                    InstHole.Range => |ranges| {
-                        comp = Inst { .CharRange = InstRange { .goto1 = i, .ranges = ranges }};
+                    InstHole.ByteClass => |class| {
+                        comp = Inst { .ByteClass = InstByteClass { .goto1 = i, .class = class }};
                     },
                     InstHole.Split => {
                         comp = Inst { .Split = InstSplit { .goto1 = i, .goto2 = i }};
@@ -258,9 +258,9 @@ pub const Compiler = struct {
                 const h = try c.push_hole(InstHole { .Char = lit });
                 return Patch { .hole = h, .entry = c.insts.len - 1 };
             },
-            Expr.CharClass => |classes| {
+            Expr.ByteClass => |classes| {
                 // Similar, we use a special instruction.
-                const h = try c.push_hole(InstHole { .Range = classes });
+                const h = try c.push_hole(InstHole { .ByteClass = classes });
                 return Patch { .hole = h, .entry = c.insts.len - 1 };
             },
             Expr.AnyCharNotNL => {
@@ -543,7 +543,7 @@ pub const Compiler = struct {
 };
 
 test "compile" {
-    const a = "a{3,}b{4}c{3,4}";
+    const a = "a{3,}b{4}c{3,4}[0-9]";
     debug.warn("\n{}\n", a);
 
     var p = Parser.init(debug.global_allocator);

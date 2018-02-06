@@ -5,12 +5,48 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const debug = std.debug;
 
-/// A character class (e.g. [a-z] or [0-9]).
-pub const ClassRange = struct {
+/// A single char range (e.g. [a-z] or [0-9]).
+pub const ByteRange = struct {
     // Lower range in class (min <= max)
     min: u8,
     // Upper range in class
     max: u8,
+};
+
+/// A number of class ranges (e.g. [a-z0-9])
+pub const ByteClass = struct {
+    ranges: ArrayList(ByteRange),
+
+    pub fn init(a: &Allocator) ByteClass {
+        return ByteClass {
+            .ranges = ArrayList(ByteRange).init(a),
+        };
+    }
+
+    pub fn deinit(cc: &ByteClass) void {
+        cc.ranges.deinit();
+    }
+
+    pub fn addRange(cc: &ByteClass, range: &const ByteRange) %void {
+        // TODO: Merging.
+        try cc.ranges.append(range);
+    }
+
+    // Negate a character class range
+    pub fn negate(cc: &ByteClass) void {
+        @panic("unimplemented character class negation");
+    }
+
+    pub fn contains(cc: &const ByteClass, ch: u8) bool {
+        // TODO: Binary search over the range.
+        for (cc.ranges.toSliceConst()) |range| {
+            if (range.min <= ch and ch <= range.max) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 };
 
 /// Repeat sequence (i.e. +, *, ?, {m,n})
@@ -41,7 +77,7 @@ pub const Expr = union(enum) {
     Repeat: Repeater,
     // Character class [a-z&&0-9]
     // NOTE: We don't handle the && union just yet.
-    CharClass: ArrayList(ClassRange),
+    ByteClass: ByteClass,
     // Concatenation
     Concat: ArrayList(&Expr),
     // |
@@ -49,10 +85,10 @@ pub const Expr = union(enum) {
     // Pseudo stack operator to define start of a capture
     PseudoLeftParen,
 
-    pub fn isCharClass(re: &const Expr) bool {
+    pub fn isByteClass(re: &const Expr) bool {
         switch (*re) {
             Expr.Literal,
-            Expr.CharClass,
+            Expr.ByteClass,
             Expr.AnyCharNotNL,
             // TODO: Don't keep capture here, but allow on repeat operators.
             Expr.Capture,
@@ -88,9 +124,9 @@ pub const Expr = union(enum) {
                     @tagName(*e), repeat.min, repeat.max, repeat.greedy);
                 repeat.subexpr.dumpIndent(indent + 1);
             },
-            Expr.CharClass => |ranges| {
+            Expr.ByteClass => |class| {
                 debug.warn("{}(", @tagName(*e));
-                for (ranges.toSliceConst()) |r|
+                for (class.ranges.toSliceConst()) |r|
                     debug.warn("[{c}-{c}]", r.min, r.max);
                 debug.warn(")\n");
             },
@@ -118,7 +154,7 @@ error MissingRepeatArgument;
 error UnbalancedParentheses;
 error UnopenedParentheses;
 error EmptyCaptureGroup;
-error UnmatchedCharClass;
+error UnmatchedByteClass;
 error StackUnderflow;
 error InvalidRepeatRange;
 error UnclosedRepeat;
@@ -170,9 +206,9 @@ pub const Parser = struct {
         return p.stack.pop();
     }
 
-    fn popCharClass(p: &Parser) %&Expr {
+    fn popByteClass(p: &Parser) %&Expr {
         const re1 = try p.popStack();
-        if (re1.isCharClass()) {
+        if (re1.isByteClass()) {
             return re1;
         } else {
             return error.MissingRepeatArgument;
@@ -198,7 +234,7 @@ pub const Parser = struct {
                     }
 
                     const repeat = Repeater {
-                        .subexpr = try p.popCharClass(),
+                        .subexpr = try p.popByteClass(),
                         .min = 0,
                         .max = null,
                         .greedy = greedy,
@@ -216,7 +252,7 @@ pub const Parser = struct {
                     }
 
                     const repeat = Repeater {
-                        .subexpr = try p.popCharClass(),
+                        .subexpr = try p.popByteClass(),
                         .min = 1,
                         .max = null,
                         .greedy = greedy,
@@ -234,7 +270,7 @@ pub const Parser = struct {
                     }
 
                     const repeat = Repeater {
-                        .subexpr = try p.popCharClass(),
+                        .subexpr = try p.popByteClass(),
                         .min = 0,
                         .max = 1,
                         .greedy = greedy,
@@ -295,7 +331,7 @@ pub const Parser = struct {
 
                     // construct the repeat
                     const repeat = Repeater {
-                        .subexpr = try p.popCharClass(),
+                        .subexpr = try p.popByteClass(),
                         .min = min,
                         .max = max,
                         .greedy = greedy,
@@ -312,29 +348,35 @@ pub const Parser = struct {
                 },
                 '[' => {
                     var r = try p.createExpr();
-                    *r = Expr { .CharClass = ArrayList(ClassRange).init(p.allocator) };
-
+                    *r = Expr { .ByteClass = ByteClass.init(p.allocator) };
                     i += 1;
 
-                    // TODO: Invert and merging of ranges.
-                    // TODO: Keep in sorted order so we can binary search.
+                    var negate = false;
+                    if (re[i] == '^') {
+                        negate = true;
+                        i += 1;
+                    }
 
                     while (re[i] != ']') : (i += 1) {
                         // read character, duplicate into a single char range
-                        var range = ClassRange { .min = re[i], .max = re[i] };
+                        var range = ByteRange { .min = re[i], .max = re[i] };
                         i += 1;
 
                         // is this a range?
                         if (re[i] == '-') {
                             i += 1;
                             if (re[i] == ']') {
-                                return error.UnmatchedCharClass;
+                                return error.UnmatchedByteClass;
                             }
 
                             range.max = re[i];
                         }
 
-                        try r.CharClass.append(range);
+                        try r.ByteClass.addRange(range);
+                    }
+
+                    if (negate) {
+                        r.ByteClass.negate();
                     }
 
                     try p.stack.append(r);

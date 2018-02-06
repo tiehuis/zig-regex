@@ -57,21 +57,17 @@ pub const VmBacktrack = struct {
                         pc = ch.goto1;
                         sp += 1;
                     },
-                    Inst.CharRange => |cr| {
+                    Inst.ByteClass => |inst| {
                         if (sp >= input.len) {
                             break;
                         }
-                        for (cr.ranges.toSliceConst()) |r| {
-                            // TODO: Binary search.
-                            if (r.min < input[sp] and input[sp] < r.max) {
-                                pc = cr.goto1;
-                                sp += 1;
-                                break;
-                            }
+                        if (!inst.class.contains(input[sp])) {
+                            // no match in any range, kill the thread
+                            break;
                         }
 
-                        // no match in any range, kill the thread
-                        break;
+                        pc = inst.goto1;
+                        sp += 1;
                     },
                     Inst.AnyCharNotNL => |c| {
                         if (sp >= input.len) {
