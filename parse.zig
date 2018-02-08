@@ -5,49 +5,13 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const debug = std.debug;
 
-/// A single char range (e.g. [a-z] or [0-9]).
-pub const ByteRange = struct {
-    // Lower range in class (min <= max)
-    min: u8,
-    // Upper range in class
-    max: u8,
-};
+const range_set = @import("range_set.zig");
+
+/// A single class range (e.g. [a-z]).
+pub const ByteRange = range_set.Range(u8);
 
 /// A number of class ranges (e.g. [a-z0-9])
-pub const ByteClass = struct {
-    ranges: ArrayList(ByteRange),
-
-    pub fn init(a: &Allocator) ByteClass {
-        return ByteClass {
-            .ranges = ArrayList(ByteRange).init(a),
-        };
-    }
-
-    pub fn deinit(cc: &ByteClass) void {
-        cc.ranges.deinit();
-    }
-
-    pub fn addRange(cc: &ByteClass, range: &const ByteRange) %void {
-        // TODO: Merging.
-        try cc.ranges.append(range);
-    }
-
-    // Negate a character class range
-    pub fn negate(cc: &ByteClass) void {
-        @panic("unimplemented character class negation");
-    }
-
-    pub fn contains(cc: &const ByteClass, ch: u8) bool {
-        // TODO: Binary search over the range.
-        for (cc.ranges.toSliceConst()) |range| {
-            if (range.min <= ch and ch <= range.max) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-};
+pub const ByteClass = range_set.RangeSet(u8);
 
 /// Repeat sequence (i.e. +, *, ?, {m,n})
 pub const Repeater = struct {
@@ -347,8 +311,7 @@ pub const Parser = struct {
                     try p.stack.append(r);
                 },
                 '[' => {
-                    var r = try p.createExpr();
-                    *r = Expr { .ByteClass = ByteClass.init(p.allocator) };
+                    var class = ByteClass.init(p.allocator);
                     i += 1;
 
                     var negate = false;
@@ -372,13 +335,15 @@ pub const Parser = struct {
                             range.max = re[i];
                         }
 
-                        try r.ByteClass.addRange(range);
+                        try class.addRange(range);
                     }
 
                     if (negate) {
-                        r.ByteClass.negate();
+                        try class.negate();
                     }
 
+                    var r = try p.createExpr();
+                    *r = Expr { .ByteClass = class };
                     try p.stack.append(r);
                 },
                 // Don't handle alternation just yet, parentheses group together arguments into
