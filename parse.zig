@@ -113,6 +113,110 @@ pub const Expr = union(enum) {
     }
 };
 
+// Private in fmt.
+error InvalidChar;
+fn charToDigit(c: u8, radix: u8) %u8 {
+    const value = switch (c) {
+        '0' ... '9' => c - '0',
+        'A' ... 'Z' => c - 'A' + 10,
+        'a' ... 'z' => c - 'a' + 10,
+        else => return error.InvalidChar,
+    };
+
+    if (value >= radix)
+        return error.InvalidChar;
+
+    return value;
+}
+
+error NoIntegerRead;
+
+const StringIterator = struct {
+    const Self = this;
+
+    slice: []const u8,
+    index: usize,
+
+    pub fn init(s: []const u8) Self {
+        return StringIterator {
+            .slice = s,
+            .index = 0,
+        };
+    }
+
+    // Advance the stream and return the next token.
+    pub fn next(it: &Self) ?u8 {
+        if (it.index < it.slice.len) {
+            const n = it.index;
+            it.index += 1;
+            return it.slice[n];
+        } else {
+            return null;
+        }
+    }
+
+    // Advance the stream.
+    pub fn bump(it: &Self) void {
+        if (it.index < it.slice.len) {
+            it.index += 1;
+        }
+    }
+
+    // Look at the nth character in the stream without advancing.
+    fn peekAhead(it: &const Self, comptime n: usize) ?u8 {
+        if (it.index + n < it.slice.len) {
+            return it.slice[it.index + n];
+        } else {
+            return null;
+        }
+    }
+
+    // Look at the next character in the stream without advancing.
+    pub fn peek(it: &const Self) ?u8 {
+        return it.peekAhead(0);
+    }
+
+    // Return true if the next character in the stream is `ch`.
+    pub fn peekIs(it: &const Self, ch: u8) bool {
+        if (it.peek()) |ok_ch| {
+            return ok_ch == ch;
+        } else {
+            return false;
+        }
+    }
+
+    // Read an integer from the stream. Any non-digit characters stops the parsing chain.
+    //
+    // Error if no digits were read.
+    // TODO: Non character word-boundary instead?
+    pub fn readInt(it: &Self, comptime T: type, comptime radix: u8) %T {
+        const start = it.index;
+
+        while (it.peek()) |ch| {
+            if (charToDigit(ch, radix)) |is_valid| {
+                it.bump();
+            } else |_| {
+                break;
+            }
+        }
+
+        if (start != it.index) {
+            return try fmt.parseUnsigned(T, it.slice[start..it.index], radix);
+        } else {
+            return error.NoIntegerRead;
+        }
+    }
+
+    pub fn skipSpaces(it: &Self) void {
+        while (it.peek()) |ok| {
+            if (ok != ' ')
+                return;
+
+            it.bump();
+        }
+    }
+};
+
 error InvalidRepeatOperand;
 error MissingRepeatArgument;
 error UnbalancedParentheses;
@@ -137,11 +241,15 @@ pub const Parser = struct {
     // Allocator for lists/node generation
     allocator: &Allocator,
 
+    // Internal parse state.
+    it: StringIterator,
+
     pub fn init(a: &Allocator) Parser {
         return Parser {
             .stack = ArrayList(&Expr).init(a),
             .node_list = ArrayList(&Expr).init(a),
             .allocator = a,
+            .it = undefined,
         };
     }
 
@@ -186,90 +294,41 @@ pub const Parser = struct {
     }
 
     pub fn parse(p: &Parser, re: []const u8) %&Expr {
-        var i: usize = 0;
+        p.it = StringIterator.init(re);
+        // Shorter alias
+        var it = &p.it;
 
-        while (i < re.len) : (i += 1) {
-            switch (re[i]) {
+        while (it.next()) |ch| {
+            // TODO: Consolidate some of the same common patterns.
+            switch (ch) {
                 '*' => {
-                    var greedy = true;
-                    if (i + 1 < re.len and re[i + 1] == '?') {
-                        greedy = false;
-                        i += 1;
-                    }
-
-                    const repeat = Repeater {
-                        .subexpr = try p.popByteClass(),
-                        .min = 0,
-                        .max = null,
-                        .greedy = greedy,
-                    };
-
-                    var r = try p.createExpr();
-                    *r = Expr { .Repeat = repeat };
-                    try p.stack.append(r);
+                    try p.parseRepeat(0, null);
                 },
                 '+' => {
-                    var greedy = true;
-                    if (i + 1 < re.len and re[i + 1] == '?') {
-                        greedy = false;
-                        i += 1;
-                    }
-
-                    const repeat = Repeater {
-                        .subexpr = try p.popByteClass(),
-                        .min = 1,
-                        .max = null,
-                        .greedy = greedy,
-                    };
-
-                    var r = try p.createExpr();
-                    *r = Expr { .Repeat = repeat };
-                    try p.stack.append(r);
+                    try p.parseRepeat(1, null);
                 },
                 '?' => {
-                    var greedy = true;
-                    if (i + 1 < re.len and re[i + 1] == '?') {
-                        greedy = false;
-                        i += 1;
-                    }
-
-                    const repeat = Repeater {
-                        .subexpr = try p.popByteClass(),
-                        .min = 0,
-                        .max = 1,
-                        .greedy = greedy,
-                    };
-
-                    var r = try p.createExpr();
-                    *r = Expr { .Repeat = repeat };
-                    try p.stack.append(r);
+                    try p.parseRepeat(0, 1);
                 },
-                // TODO: Add some parsing/iteration helpers as this is ugly and does not
-                // handle early ending strings.
                 '{' => {
-                    i += 1;
-                    while (re[i] == ' ') i += 1;
+                    it.skipSpaces();
 
-                    const start = i;
-                    while ('0' <= re[i] and re[i] <= '9') i += 1;
-
-                    const min = try fmt.parseUnsigned(usize, re[start..i], 10);
+                    const min = try it.readInt(usize, 10);
                     var max: ?usize = min;
 
-                    while (re[i] == ' ') i += 1;
-                    if (re[i] == ',') {
-                        i += 1;
-                        while (re[i] == ' ') i += 1;
+                    it.skipSpaces();
+
+                    if (it.peekIs(',')) {
+                        it.bump();
+                        it.skipSpaces();
 
                         // {m,} case with infinite upper bound
-                        if (re[i] == '}') {
+                        if (it.peekIs('}')) {
                             max = null;
                         }
                         // {m,n} case with explicit bounds
                         else {
-                            const start2 = i;
-                            while ('0' <= re[i] and re[i] <= '9') i += 1;
-                            max = try fmt.parseUnsigned(usize, re[start2..i], 10);
+                            max = try it.readInt(usize, 10);
 
                             if (??max < min) {
                                 return error.InvalidRepeatRange;
@@ -277,33 +336,18 @@ pub const Parser = struct {
                         }
                     }
 
-                    while (re[i] == ' ') i += 1;
-                    if (re[i] != '}') {
+                    it.skipSpaces();
+                    if (!it.peekIs('}')) {
                         return error.UnclosedRepeat;
                     }
+                    it.bump();
 
                     // We limit repeat counts to overoad arbitrary memory blowup during compilation
                     if (min > repeat_max_length or max != null and ??max > repeat_max_length) {
                         return error.ExcessiveRepeatCount;
                     }
 
-                    var greedy = true;
-                    if (i + 1 < re.len and re[i + 1] == '?') {
-                        greedy = false;
-                        i += 1;
-                    }
-
-                    // construct the repeat
-                    const repeat = Repeater {
-                        .subexpr = try p.popByteClass(),
-                        .min = min,
-                        .max = max,
-                        .greedy = greedy,
-                    };
-
-                    var r = try p.createExpr();
-                    *r = Expr { .Repeat = repeat };
-                    try p.stack.append(r);
+                    try p.parseRepeat(min, max);
                 },
                 '.' => {
                     var r = try p.createExpr();
@@ -312,31 +356,31 @@ pub const Parser = struct {
                 },
                 '[' => {
                     var class = ByteClass.init(p.allocator);
-                    i += 1;
 
                     var negate = false;
-                    if (re[i] == '^') {
+                    if (it.peekIs('^')) {
+                        it.bump();
                         negate = true;
-                        i += 1;
                     }
 
-                    while (re[i] != ']') : (i += 1) {
+                    while (!it.peekIs(']')) : (it.bump()) {
                         // read character, duplicate into a single char range
-                        var range = ByteRange { .min = re[i], .max = re[i] };
-                        i += 1;
+                        var range = ByteRange { .min = ??it.peek(), .max = ??it.peek() };
+                        it.bump();
 
                         // is this a range?
-                        if (re[i] == '-') {
-                            i += 1;
-                            if (re[i] == ']') {
+                        if (it.peekIs('-')) {
+                            it.bump();
+                            if (it.peekIs(']')) {
                                 return error.UnmatchedByteClass;
                             }
 
-                            range.max = re[i];
+                            range.max = ??it.peek();
                         }
 
                         try class.addRange(range);
                     }
+                    it.bump();
 
                     if (negate) {
                         try class.negate();
@@ -457,7 +501,6 @@ pub const Parser = struct {
                             },
                             // Existing parentheses, push new alternation
                             Expr.PseudoLeftParen => {
-                                debug.warn("pseudo operator\n");
                                 // re-push parentheses marker
                                 try p.stack.append(e);
 
@@ -479,6 +522,9 @@ pub const Parser = struct {
                         }
                     }
                 },
+                '\\' => {
+                    try p.parseEscape();
+                },
                 '^' => {
                     var r = try p.createExpr();
                     *r = Expr.BeginLine;
@@ -490,9 +536,7 @@ pub const Parser = struct {
                     try p.stack.append(r);
                 },
                 else => {
-                    var r = try p.createExpr();
-                    *r = Expr { .Literal = re[i] };
-                    try p.stack.append(r);
+                    try p.parseLiteral(ch);
                 },
             }
         }
@@ -541,6 +585,45 @@ pub const Parser = struct {
                     try concat.append(e);
                 },
             }
+        }
+    }
+
+    fn parseLiteral(p: &Parser, ch: u8) %void {
+        var r = try p.createExpr();
+        *r = Expr { .Literal = ch };
+        try p.stack.append(r);
+    }
+
+    fn parseRepeat(p: &Parser, min: usize, max: ?usize) %void {
+        var greedy = true;
+        if (p.it.peekIs('?')) {
+            p.it.bump();
+            greedy = false;
+        }
+
+        const repeat = Repeater {
+            .subexpr = try p.popByteClass(),
+            .min = min,
+            .max = max,
+            .greedy = greedy,
+        };
+
+        var r = try p.createExpr();
+        *r = Expr { .Repeat = repeat };
+        try p.stack.append(r);
+    }
+
+    fn parseEscape(p: &Parser) %void {
+        p.it.bump();
+        // TODO: More escape codes
+        switch (??p.it.next()) {
+            'a' => try p.parseLiteral('\x07'),
+            'f' => try p.parseLiteral('\x0c'),
+            'n' => try p.parseLiteral('\n'),
+            'r' => try p.parseLiteral('\r'),
+            't' => try p.parseLiteral('\t'),
+            'v' => try p.parseLiteral('\x0b'),
+            else => @panic("unknown escape code"),
         }
     }
 };
