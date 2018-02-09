@@ -19,6 +19,10 @@ pub fn Range(comptime T: type) type {
                 return Range(T) { .min = max, .max = min };
             }
         }
+
+        pub fn single(item: T) Range(T) {
+            return Range(T) { .min = item, .max = item };
+        }
     };
 }
 
@@ -39,7 +43,7 @@ pub fn RangeSet(comptime T: type) type {
             };
         }
 
-        pub fn deinit(self: &const Self) void {
+        pub fn deinit(self: &Self) void {
             self.ranges.deinit();
         }
 
@@ -138,6 +142,65 @@ pub fn RangeSet(comptime T: type) type {
         }
     };
 }
+
+pub const ByteClassTemplates = struct {
+    const ByteRange = Range(u8);
+    const ByteClass = RangeSet(u8);
+
+    pub fn Whitespace(a: &Allocator) !ByteClass {
+        var rs = ByteClass.init(a);
+        errdefer rs.deinit();
+
+        // \t, \n, \v, \f, \r
+        try rs.addRange(ByteRange.new('\x09', '\x0D'));
+
+        return rs;
+    }
+
+    pub fn NonWhitespace(a: &Allocator) !ByteClass {
+        var rs = try Whitespace(a);
+        errdefer rs.deinit();
+
+        try rs.negate();
+        return rs;
+    }
+
+    pub fn AlphaNumeric(a: &Allocator) !ByteClass {
+        var rs = ByteClass.init(a);
+        errdefer rs.deinit();
+
+        try rs.addRange(ByteRange.new('0', '9'));
+        try rs.addRange(ByteRange.new('A', 'Z'));
+        try rs.addRange(ByteRange.new('a', 'z'));
+
+        return rs;
+    }
+
+    pub fn NonAlphaNumeric(a: &Allocator) !ByteClass {
+        var rs = try AlphaNumeric(a);
+        errdefer rs.deinit();
+
+        try rs.negate();
+        return rs;
+    }
+
+    pub fn Digits(a: &Allocator) !ByteClass {
+        var rs = ByteClass.init(a);
+        errdefer rs.deinit();
+
+        try rs.addRange(ByteRange.new('0', '9'));
+
+        return rs;
+    }
+
+    pub fn NonDigits(a: &Allocator) !ByteClass {
+        var rs = try AlphaNumeric(a);
+        errdefer rs.deinit();
+
+        try rs.negate();
+        return rs;
+    }
+};
 
 var alloc = debug.global_allocator;
 

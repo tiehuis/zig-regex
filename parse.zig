@@ -6,6 +6,7 @@ const ArrayList = std.ArrayList;
 const debug = std.debug;
 
 const range_set = @import("range_set.zig");
+const ByteClassTemplates = range_set.ByteClassTemplates;
 
 /// A single class range (e.g. [a-z]).
 pub const ByteRange = range_set.Range(u8);
@@ -614,14 +615,57 @@ pub const Parser = struct {
 
     fn parseEscape(p: &Parser) !void {
         p.it.bump();
-        // TODO: More escape codes
         switch (??p.it.next()) {
+            // escape chars
             'a' => try p.parseLiteral('\x07'),
             'f' => try p.parseLiteral('\x0c'),
             'n' => try p.parseLiteral('\n'),
             'r' => try p.parseLiteral('\r'),
             't' => try p.parseLiteral('\t'),
             'v' => try p.parseLiteral('\x0b'),
+            // perl codes
+            's' => {
+                var s = try ByteClassTemplates.Whitespace(p.allocator);
+
+                var r = try p.createExpr();
+                *r = Expr { .ByteClass = s };
+                try p.stack.append(r);
+            },
+            'S' => {
+                var s = try ByteClassTemplates.NonWhitespace(p.allocator);
+
+                var r = try p.createExpr();
+                *r = Expr { .ByteClass = s };
+                try p.stack.append(r);
+            },
+            'w' => {
+                var s = try ByteClassTemplates.AlphaNumeric(p.allocator);
+
+                var r = try p.createExpr();
+                *r = Expr { .ByteClass = s };
+                try p.stack.append(r);
+            },
+            'W' => {
+                var s = try ByteClassTemplates.NonAlphaNumeric(p.allocator);
+
+                var r = try p.createExpr();
+                *r = Expr { .ByteClass = s };
+                try p.stack.append(r);
+            },
+            'd' => {
+                var s = try ByteClassTemplates.Digits(p.allocator);
+
+                var r = try p.createExpr();
+                *r = Expr { .ByteClass = s };
+                try p.stack.append(r);
+            },
+            'D' => {
+                var s = try ByteClassTemplates.NonDigits(p.allocator);
+
+                var r = try p.createExpr();
+                *r = Expr { .ByteClass = s };
+                try p.stack.append(r);
+            },
             else => @panic("unknown escape code"),
         }
     }
