@@ -10,8 +10,6 @@ const Compiler = @import("compile.zig").Compiler;
 const Prog = @import("compile.zig").Prog;
 const Inst = @import("compile.zig").Inst;
 
-error RegexpOverflow;
-
 pub const VmBacktrack = struct {
     // A thread of execution in the vm.
     const Thread = struct {
@@ -25,7 +23,7 @@ pub const VmBacktrack = struct {
         }
     };
 
-    pub fn exec(engine: &const VmBacktrack, prog: &const Prog, input: []const u8) %bool {
+    pub fn exec(engine: &const VmBacktrack, prog: &const Prog, input: []const u8) !bool {
         const max_thread = 1000;
 
         var ready: [max_thread]Thread = undefined;

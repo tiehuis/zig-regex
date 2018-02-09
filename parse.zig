@@ -114,8 +114,7 @@ pub const Expr = union(enum) {
 };
 
 // Private in fmt.
-error InvalidChar;
-fn charToDigit(c: u8, radix: u8) %u8 {
+fn charToDigit(c: u8, radix: u8) !u8 {
     const value = switch (c) {
         '0' ... '9' => c - '0',
         'A' ... 'Z' => c - 'A' + 10,
@@ -128,8 +127,6 @@ fn charToDigit(c: u8, radix: u8) %u8 {
 
     return value;
 }
-
-error NoIntegerRead;
 
 const StringIterator = struct {
     const Self = this;
@@ -189,7 +186,7 @@ const StringIterator = struct {
     //
     // Error if no digits were read.
     // TODO: Non character word-boundary instead?
-    pub fn readInt(it: &Self, comptime T: type, comptime radix: u8) %T {
+    pub fn readInt(it: &Self, comptime T: type, comptime radix: u8) !T {
         const start = it.index;
 
         while (it.peek()) |ch| {
@@ -217,16 +214,18 @@ const StringIterator = struct {
     }
 };
 
-error InvalidRepeatOperand;
-error MissingRepeatArgument;
-error UnbalancedParentheses;
-error UnopenedParentheses;
-error EmptyCaptureGroup;
-error UnmatchedByteClass;
-error StackUnderflow;
-error InvalidRepeatRange;
-error UnclosedRepeat;
-error ExcessiveRepeatCount;
+pub const ParseError = error {
+    InvalidRepeatOperand,
+    MissingRepeatArgument,
+    UnbalancedParentheses,
+    UnopenedParentheses,
+    EmptyCaptureGroup,
+    UnmatchedByteClass,
+    StackUnderflow,
+    InvalidRepeatRange,
+    UnclosedRepeat,
+    ExcessiveRepeatCount,
+};
 
 const repeat_max_length = 1000;
 
@@ -270,7 +269,7 @@ pub const Parser = struct {
         p.node_list.shrink(0);
     }
 
-    fn popStack(p: &Parser) %&Expr {
+    fn popStack(p: &Parser) !&Expr {
         if (p.stack.len == 0) {
             return error.StackUnderflow;
         }
@@ -278,7 +277,7 @@ pub const Parser = struct {
         return p.stack.pop();
     }
 
-    fn popByteClass(p: &Parser) %&Expr {
+    fn popByteClass(p: &Parser) !&Expr {
         const re1 = try p.popStack();
         if (re1.isByteClass()) {
             return re1;
@@ -287,13 +286,13 @@ pub const Parser = struct {
         }
     }
 
-    fn createExpr(p: &Parser) %&Expr {
+    fn createExpr(p: &Parser) !&Expr {
         const r = try p.allocator.create(Expr);
         try p.node_list.append(r);
         return r;
     }
 
-    pub fn parse(p: &Parser, re: []const u8) %&Expr {
+    pub fn parse(p: &Parser, re: []const u8) !&Expr {
         p.it = StringIterator.init(re);
         // Shorter alias
         var it = &p.it;
@@ -588,13 +587,13 @@ pub const Parser = struct {
         }
     }
 
-    fn parseLiteral(p: &Parser, ch: u8) %void {
+    fn parseLiteral(p: &Parser, ch: u8) !void {
         var r = try p.createExpr();
         *r = Expr { .Literal = ch };
         try p.stack.append(r);
     }
 
-    fn parseRepeat(p: &Parser, min: usize, max: ?usize) %void {
+    fn parseRepeat(p: &Parser, min: usize, max: ?usize) !void {
         var greedy = true;
         if (p.it.peekIs('?')) {
             p.it.bump();
@@ -613,7 +612,7 @@ pub const Parser = struct {
         try p.stack.append(r);
     }
 
-    fn parseEscape(p: &Parser) %void {
+    fn parseEscape(p: &Parser) !void {
         p.it.bump();
         // TODO: More escape codes
         switch (??p.it.next()) {

@@ -46,7 +46,7 @@ pub const Regex = struct {
     // Which engine we are using, have a literal matcher engine too
     engine: VmBacktrack,
 
-    pub fn compile(a: &Allocator, re: []const u8) %Regex {
+    pub fn compile(a: &Allocator, re: []const u8) !Regex {
         var p = Parser.init(a);
         defer p.deinit();
 
@@ -84,14 +84,14 @@ pub const Regex = struct {
     }
 
     // does the regex match the entire input string? simply run through from the first position.
-    pub fn match(re: &const Regex, input: []const u8) %bool {
+    pub fn match(re: &const Regex, input: []const u8) !bool {
         // TODO: Need to specify $ on trailing?
         return re.engine.exec(re.compiled, input);
     }
 
     // does the regexp match any region within the string? memchr to the first byte in the regex
     // (if possible) and then run the matcher from there. this is important.
-    pub fn partialMatch(re: &const Regex, input: []const u8) %bool {
+    pub fn partialMatch(re: &const Regex, input: []const u8) !bool {
         // TODO: Prepend .* before and bail early on complete match
         return re.engine.exec(re.compiled, input);
     }

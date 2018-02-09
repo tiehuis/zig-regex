@@ -227,7 +227,7 @@ pub const Compiler = struct {
     }
 
     // Compile the regex expression
-    pub fn compile(c: &Compiler, expr: &const Expr) %Prog {
+    pub fn compile(c: &Compiler, expr: &const Expr) !Prog {
         const patch = try c.compile_internal(expr);
         // fill any holes to end at the next instruction which will be a match
         c.fill_to_next(patch.hole);
@@ -252,7 +252,7 @@ pub const Compiler = struct {
         return Prog.init(p.toOwnedSlice());
     }
 
-    fn compile_internal(c: &Compiler, expr: &const Expr) %Patch {
+    fn compile_internal(c: &Compiler, expr: &const Expr) Allocator.Error!Patch {
         switch (*expr) {
             Expr.Literal => |lit| {
                 const h = try c.push_hole(InstHole { .Char = lit });
@@ -416,7 +416,7 @@ pub const Compiler = struct {
 
     ////////////////////
     // Compile Helpers
-    fn compile_star(c: &Compiler, expr: &Expr, greedy: bool) %Patch {
+    fn compile_star(c: &Compiler, expr: &Expr, greedy: bool) !Patch {
         // 1: split 2, 4
         // 2: subexpr
         // 3: jmp 1
@@ -452,7 +452,7 @@ pub const Compiler = struct {
         return Patch { .hole = h, .entry = entry };
     }
 
-    fn compile_plus(c: &Compiler, expr: &Expr, greedy: bool) %Patch {
+    fn compile_plus(c: &Compiler, expr: &Expr, greedy: bool) !Patch {
         // 1: subexpr
         // 2: split 1, 3
         // 3: ...
@@ -478,7 +478,7 @@ pub const Compiler = struct {
         return Patch { .hole = h, .entry = p.entry };
     }
 
-    fn compile_question(c: &Compiler, expr: &Expr, greedy: bool) %Patch {
+    fn compile_question(c: &Compiler, expr: &Expr, greedy: bool) !Patch {
         // 1: split 2, 3
 
         // 2: subexpr
@@ -510,12 +510,12 @@ pub const Compiler = struct {
     // Instruction Helpers
 
     // Push a compiled instruction directly onto the stack.
-    fn push_compiled(c: &Compiler, i: &const Inst) %void {
+    fn push_compiled(c: &Compiler, i: &const Inst) !void {
         try c.insts.append(PartialInst { .Compiled = *i });
     }
 
     // Push a instruction with a hole onto the set
-    fn push_hole(c: &Compiler, i: &const InstHole) %Hole {
+    fn push_hole(c: &Compiler, i: &const InstHole) !Hole {
         const h = c.insts.len;
         try c.insts.append(PartialInst { .Uncompiled = *i });
         return Hole { .One = h };

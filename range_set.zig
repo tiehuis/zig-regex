@@ -44,7 +44,7 @@ pub fn RangeSet(comptime T: type) type {
         }
 
         // Add a range into the current class, preserving the structure invariants.
-        pub fn addRange(self: &Self, range: &const RangeType) %void {
+        pub fn addRange(self: &Self, range: &const RangeType) !void {
             var ranges = &self.ranges;
 
             if (ranges.len == 0) {
@@ -88,7 +88,7 @@ pub fn RangeSet(comptime T: type) type {
         // the inverted set. i.e. contains(a, byte) == !contains(b, byte) if a == b.negated().
         //
         // The negation is performed in place.
-        pub fn negate(self: &Self) %void {
+        pub fn negate(self: &Self) !void {
             var ranges = &self.ranges;
             // NOTE: Append to end of array then copy and shrink.
             var negated = ArrayList(RangeType).init(self.ranges.allocator);
