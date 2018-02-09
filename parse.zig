@@ -92,7 +92,7 @@ pub const Expr = union(enum) {
             Expr.ByteClass => |class| {
                 debug.warn("{}(", @tagName(*e));
                 for (class.ranges.toSliceConst()) |r|
-                    debug.warn("[{c}-{c}]", r.min, r.max);
+                    debug.warn("[{}-{}]", r.min, r.max);
                 debug.warn(")\n");
             },
             // TODO: Can we get better type unification on enum variants with the same type?
@@ -615,6 +615,7 @@ pub const Parser = struct {
 
     fn parseEscape(p: &Parser) !void {
         p.it.bump();
+
         switch (??p.it.next()) {
             // escape chars
             'a' => try p.parseLiteral('\x07'),
@@ -673,10 +674,13 @@ pub const Parser = struct {
 
 test "parse" {
     var p = Parser.init(debug.global_allocator);
-    const a = "^abc(def)[a-e0-9](asd|er)+a{5}b{90,}c{90,1000}?$";
+    const a = \\^abc(def)[a-e0-9](asd|er)+a{5}b{90,}c{90,1000}?\\s\\S$
+            ;
+
     const expr = try p.parse(a);
+
+    expr.dump();
 
     debug.warn("\n");
     debug.warn("{}\n\n", a);
-    expr.dump();
 }
