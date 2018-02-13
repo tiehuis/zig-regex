@@ -688,16 +688,3 @@ pub const Parser = struct {
         }
     }
 };
-
-test "parse" {
-    var p = Parser.init(debug.global_allocator);
-    const a = \\^abc(def)[a-e0-9](asd|er)+a{5}b{90,}c{90,1000}?\\s\\S$
-            ;
-
-    const expr = try p.parse(a);
-
-    expr.dump();
-
-    debug.warn("\n");
-    debug.warn("{}\n\n", a);
-}
