@@ -8,6 +8,7 @@ const parser = @import("parse.zig");
 const Parser = parser.Parser;
 const ByteClass = parser.ByteClass;
 const Expr = parser.Expr;
+const Assertion = parser.Assertion;
 
 const InstSplit = struct {
     goto1: usize,
@@ -28,6 +29,11 @@ const InstJump = struct {
     goto1: usize,
 };
 
+const InstEmptyMatch = struct {
+    goto1: usize,
+    assertion: Assertion,
+};
+
 // Represents instructions for the VM.
 pub const Inst = union(enum) {
     // Match the specified character.
@@ -38,6 +44,9 @@ pub const Inst = union(enum) {
 
     // Matches the AnyChar special cases
     AnyCharNotNL: InstJump,
+
+    // Empty match (\w assertion)
+    EmptyMatch: InstEmptyMatch,
 
     // Stop the thread, found a match
     Match,
@@ -52,6 +61,9 @@ pub const Inst = union(enum) {
         switch (*s) {
             Inst.Char => |x| {
                 debug.warn("char {}, '{c}'\n", x.goto1, x.c);
+            },
+            Inst.EmptyMatch => |x| {
+                debug.warn("emptymatch({}) {}\n", @tagName(x.assertion), x.goto1);
             },
             Inst.ByteClass => |x| {
                 debug.warn("range {}, ", x.goto1);
@@ -81,6 +93,8 @@ const InstHole = union(enum) {
     Char: u8,
     // Match a character class range
     ByteClass: ByteClass,
+    // Empty Match assertion
+    EmptyMatch: Assertion,
     // Match any character
     AnyCharNotNL,
     // Split with no unfilled branch
@@ -95,6 +109,9 @@ const InstHole = union(enum) {
         switch (*s) {
             InstHole.Char => |ch| {
                 debug.warn("('{c}')\n", ch);
+            },
+            InstHole.EmptyMatch => |assertion| {
+                debug.warn("({})\n", @tagName(assertion));
             },
             InstHole.ByteClass => |x| {
                 debug.warn("(");
@@ -136,6 +153,9 @@ const PartialInst = union(enum) {
                 switch (ih) {
                     InstHole.Char => |ch| {
                         comp = Inst { .Char = InstChar { .goto1 = i, .c = ch }};
+                    },
+                    InstHole.EmptyMatch => |assertion| {
+                        comp = Inst { .EmptyMatch = InstEmptyMatch { .goto1 = i, .assertion = assertion }};
                     },
                     InstHole.AnyCharNotNL => {
                         comp = Inst { .AnyCharNotNL = InstJump { .goto1 = i }};
@@ -267,10 +287,9 @@ pub const Compiler = struct {
                 const h = try c.push_hole(InstHole.AnyCharNotNL);
                 return Patch { .hole = h, .entry = c.insts.len - 1 };
             },
-            // TODO: Have an assert instruction (empty-match) which does the check and doesn't
-            // advance the thread if it fails.
-            Expr.BeginLine, Expr.EndLine => {
-                @panic("unhandled ^, $ assertions");
+            Expr.EmptyMatch => |assertion| {
+                const h = try c.push_hole(InstHole { .EmptyMatch = assertion });
+                return Patch { .hole = h, .entry = c.insts.len - 1 };
             },
             Expr.Repeat => |repeat| {
                 // Case 1: *
@@ -543,7 +562,7 @@ pub const Compiler = struct {
 };
 
 test "compile" {
-    const a = "a{3,}b{4}c{3,4}[0-9]";
+    const a = "a{3,}b{4}c{3,4}[0-9]$";
     debug.warn("\n{}\n", a);
 
     var p = Parser.init(debug.global_allocator);

@@ -26,16 +26,30 @@ pub const Repeater = struct {
     greedy: bool,
 };
 
+/// A specific assertion type.
+pub const Assertion = enum {
+    // ^ anchor, beginning of text (or line depending on mode)
+    BeginLine,
+    // $ anchor, beginning of text (or line dependening on mode)
+    EndLine,
+    // \A anchor, beginning of text
+    BeginText,
+    // \z anchor, end of text
+    EndText,
+    // \w anchor, word boundary ascii
+    WordBoundaryAscii,
+    // \W anchor, non-word boundary ascii
+    NotWordBoundaryAscii,
+};
+
 /// Represents a single node in an AST.
 pub const Expr = union(enum) {
+    // Empty match (\w assertion)
+    EmptyMatch: Assertion,
     // A single character byte to match
     Literal: u8,
     // . character
     AnyCharNotNL,
-    // ^ anchor
-    BeginLine,
-    // $ anchor
-    EndLine,
     // Capture group
     Capture: &Expr,
     // *, +, ?
@@ -74,8 +88,11 @@ pub const Expr = union(enum) {
         }
 
         switch (*e) {
-            Expr.AnyCharNotNL, Expr.BeginLine, Expr.EndLine => {
+            Expr.AnyCharNotNL => {
                 debug.warn("{}\n", @tagName(*e));
+            },
+            Expr.EmptyMatch => |assertion| {
+                debug.warn("{}({})\n", @tagName(*e), @tagName(assertion));
             },
             Expr.Literal => |lit| {
                 debug.warn("{}({c})\n", @tagName(*e), lit);
@@ -527,12 +544,12 @@ pub const Parser = struct {
                 },
                 '^' => {
                     var r = try p.createExpr();
-                    *r = Expr.BeginLine;
+                    *r = Expr { .EmptyMatch = Assertion.BeginLine };
                     try p.stack.append(r);
                 },
                 '$' => {
                     var r = try p.createExpr();
-                    *r = Expr.EndLine;
+                    *r = Expr { .EmptyMatch = Assertion.EndLine };
                     try p.stack.append(r);
                 },
                 else => {

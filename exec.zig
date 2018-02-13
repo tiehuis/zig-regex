@@ -4,11 +4,66 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const debug = std.debug;
 
-const Parser = @import("parse.zig").Parser;
-const Expr = @import("parse.zig").Expr;
-const Compiler = @import("compile.zig").Compiler;
-const Prog = @import("compile.zig").Prog;
-const Inst = @import("compile.zig").Inst;
+const parse = @import("parse.zig");
+const compile = @import("compile.zig");
+
+const Parser = parse.Parser;
+const Expr = parse.Expr;
+const Assertion = parse.Assertion;
+const Compiler = compile.Compiler;
+const Prog = compile.Prog;
+const Inst = compile.Inst;
+
+const Input = struct {
+    slice: []const u8,
+    len: usize,
+
+    pub fn init(slice: []const u8) Input {
+        return Input {
+            .slice = slice,
+            .len = slice.len,
+        };
+    }
+
+    pub fn at(i: &const Input, n: usize) u8 {
+        return i.slice[n];
+    }
+
+    fn isWordChar(c: u8) bool {
+        return switch (c) {
+            '0' ... '9', 'a' ... 'z', 'A' ... 'Z' => true,
+            else => false,
+        };
+    }
+
+    pub fn isEmptyMatch(i: &const Input, n: usize, match: &const Assertion) bool {
+        switch (*match) {
+            Assertion.BeginLine => {
+                return n == 0;
+            },
+            Assertion.EndLine => {
+                return n == i.len - 1;
+            },
+            Assertion.BeginText => {
+                // TODO: Handle different modes.
+                return n == 0;
+            },
+            Assertion.EndText => {
+                return n == i.len - 1;
+            },
+            Assertion.WordBoundaryAscii => {
+                const last = (n == 0) or isWordChar(i.slice[n-1]);
+                const next = (n == i.len - 1) or isWordChar(i.slice[n+1]);
+                return last != next;
+            },
+            Assertion.NotWordBoundaryAscii => {
+                const last = (n == 0) or isWordChar(i.slice[n-1]);
+                const next = (n == i.len - 1) or isWordChar(i.slice[n+1]);
+                return last == next;
+            },
+        }
+    }
+};
 
 pub const VmBacktrack = struct {
     // A thread of execution in the vm.
@@ -33,6 +88,8 @@ pub const VmBacktrack = struct {
         ready[0] = Thread.init(prog.start, 0);
         ready_count = 1;
 
+        const inp = Input.init(input);
+
         while (ready_count > 0) {
             // Pop the thread
             ready_count -= 1;
@@ -44,10 +101,10 @@ pub const VmBacktrack = struct {
             while (true) {
                 switch (prog.insts[pc]) {
                     Inst.Char => |ch| {
-                        if (sp >= input.len) {
+                        if (sp >= inp.len) {
                             break;
                         }
-                        if (ch.c != input[sp]) {
+                        if (ch.c != inp.at(sp)) {
                             // no match, kill the thread
                             break;
                         }
@@ -55,8 +112,20 @@ pub const VmBacktrack = struct {
                         pc = ch.goto1;
                         sp += 1;
                     },
+                    Inst.EmptyMatch => |em| {
+                        if (sp >= inp.len) {
+                            break;
+                        }
+                        if (!inp.isEmptyMatch(sp, em.assertion)) {
+                            // no match, kill thread
+                            break;
+                        }
+
+                        pc = em.goto1;
+                        // do not advance sp
+                    },
                     Inst.ByteClass => |inst| {
-                        if (sp >= input.len) {
+                        if (sp >= inp.len) {
                             break;
                         }
                         if (!inst.class.contains(input[sp])) {
@@ -108,12 +177,14 @@ pub const VmBacktrack = struct {
 
 test "exec backtrack" {
     var p = Parser.init(debug.global_allocator);
-    const expr = try p.parse("abc+d+.?");
+    const expr = try p.parse("^abc+d+.?");
 
     expr.dump();
 
     var c = Compiler.init(debug.global_allocator);
     const bytecode = try c.compile(expr);
+
+    bytecode.dump();
 
     const engine = VmBacktrack{};
 
