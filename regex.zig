@@ -85,15 +85,13 @@ pub const Regex = struct {
 
     // does the regex match the entire input string? simply run through from the first position.
     pub fn match(re: &const Regex, input: []const u8) !bool {
-        // TODO: Need to specify $ on trailing?
-        return re.engine.exec(re.compiled, input);
+        return re.engine.exec(re.compiled, re.compiled.start, input);
     }
 
     // does the regexp match any region within the string? memchr to the first byte in the regex
     // (if possible) and then run the matcher from there. this is important.
     pub fn partialMatch(re: &const Regex, input: []const u8) !bool {
-        // TODO: Prepend .* before and bail early on complete match
-        return re.engine.exec(re.compiled, input);
+        return re.engine.exec(re.compiled, re.compiled.find_start, input);
     }
 
     // where does the string match?
@@ -109,4 +107,7 @@ test "regex" {
     debug.assert((try re.match("abcccccd")) == true);
     debug.assert((try re.match("abcdddddZ")) == true);
     debug.assert((try re.match("abd")) == false);
+
+    debug.assert((try re.match("____abcd")) == false);
+    debug.assert((try re.partialMatch("_____abcd")) == true);
 }

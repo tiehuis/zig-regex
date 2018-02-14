@@ -81,14 +81,14 @@ pub const VmBacktrack = struct {
         }
     };
 
-    pub fn exec(engine: &const VmBacktrack, prog: &const Prog, input: []const u8) !bool {
+    pub fn exec(engine: &const VmBacktrack, prog: &const Prog, start: usize, input: []const u8) !bool {
         const max_thread = 1000;
 
         var ready: [max_thread]Thread = undefined;
         var ready_count: usize = 0;
 
         // queue initial thread
-        ready[0] = Thread.init(prog.start, 0);
+        ready[0] = Thread.init(start, 0);
         ready_count = 1;
 
         const inp = Input.init(input);
@@ -191,8 +191,8 @@ test "exec backtrack" {
 
     const engine = VmBacktrack{};
 
-    debug.assert((try engine.exec(bytecode, "abcd")) == true);
-    debug.assert((try engine.exec(bytecode, "abccccd")) == true);
-    debug.assert((try engine.exec(bytecode, "abcdddddZ")) == true);
-    debug.assert((try engine.exec(bytecode, "abd")) == false);
+    debug.assert((try engine.exec(bytecode, 0, "abcd")) == true);
+    debug.assert((try engine.exec(bytecode, 0, "abccccd")) == true);
+    debug.assert((try engine.exec(bytecode, 0, "abcdddddZ")) == true);
+    debug.assert((try engine.exec(bytecode, 0, "abd")) == false);
 }

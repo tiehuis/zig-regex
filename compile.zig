@@ -191,11 +191,14 @@ pub const Prog = struct {
     insts: []const Inst,
     // Start instruction
     start: InstPtr,
+    // Find Start instruction
+    find_start: InstPtr,
 
-    pub fn init(a: []const Inst) Prog {
+    pub fn init(a: []const Inst, find_start: usize) Prog {
         return Prog {
             .insts = a,
             .start = 0,
+            .find_start = find_start,
         };
     }
 
@@ -269,7 +272,24 @@ pub const Compiler = struct {
             }
         }
 
-        return Prog.init(p.toOwnedSlice());
+        // To facilitate fast finding (matching non-anchored to the start) we simply append a
+        // .*? to the start of our instructions. We push the fragment with this set of instructions
+        // at the end of the compiled set. We perform an anchored search by entering normally and
+        // a non-anchored by jumping to this patch before starting.
+        //
+        // 1: compiled instructions
+        // 2: match
+        // ... # We add the following
+        // 3: split 1, 4
+        // 4: any 3
+        const fragment_start = c.insts.len;
+        const fragment = []Inst {
+            Inst { .Split = InstSplit { .goto1 = 0, .goto2 = fragment_start + 1 }},
+            Inst { .AnyCharNotNL = InstJump { .goto1 = fragment_start }},
+        };
+        try p.appendSlice(fragment);
+
+        return Prog.init(p.toOwnedSlice(), fragment_start);
     }
 
     fn compile_internal(c: &Compiler, expr: &const Expr) Allocator.Error!Patch {
