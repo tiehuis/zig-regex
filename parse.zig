@@ -558,6 +558,11 @@ pub const Parser = struct {
             }
         }
 
+        // special case single item to avoid top-level concat for simple.
+        if (p.stack.len == 1) {
+            return p.stack.pop();
+        }
+
         // finish a concatenation result
         //
         // This pops items off the stack and concatenates them until:

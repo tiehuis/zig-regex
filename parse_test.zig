@@ -142,9 +142,7 @@ fn check(re: []const u8, expected_ast: []const u8) void {
 test "regex parse tests" {
     // These are taken off rust-regex for the moment.
 
-    // TODO: Don't concatenate when the top-level is a single item or already an array sub-expression.
     // TODO: This should use a special expression.
-
     check(
         \\
     ,
@@ -154,8 +152,7 @@ test "regex parse tests" {
     check(
         \\a
     ,
-        \\cat
-        \\ lit(a)
+        \\lit(a)
     );
 
     check(
@@ -177,9 +174,8 @@ test "regex parse tests" {
     check(
         \\a?
     ,
-        \\cat
-        \\ rep(?)
-        \\  lit(a)
+        \\rep(?)
+        \\ lit(a)
     );
 
     check(
@@ -194,101 +190,89 @@ test "regex parse tests" {
     check(
         \\a??
     ,
-        \\cat
-        \\ rep(??)
-        \\  lit(a)
+        \\rep(??)
+        \\ lit(a)
     );
 
     check(
         \\a+
     ,
-        \\cat
-        \\ rep(+)
-        \\  lit(a)
+        \\rep(+)
+        \\ lit(a)
     );
 
     check(
         \\a+?
     ,
-        \\cat
-        \\ rep(+?)
-        \\  lit(a)
+        \\rep(+?)
+        \\ lit(a)
     );
 
     check(
         \\a*?
     ,
-        \\cat
-        \\ rep(*?)
-        \\  lit(a)
+        \\rep(*?)
+        \\ lit(a)
     );
 
     check(
         \\a{5}
     ,
-        \\cat
-        \\ rep({5,5})
-        \\  lit(a)
+        \\rep({5,5})
+        \\ lit(a)
     );
 
     check(
         \\a{5,}
     ,
-        \\cat
-        \\ rep({5,})
-        \\  lit(a)
+        \\rep({5,})
+        \\ lit(a)
     );
 
     check(
         \\a{5,10}
     ,
-        \\cat
-        \\ rep({5,10})
-        \\  lit(a)
+        \\rep({5,10})
+        \\ lit(a)
     );
 
     check(
         \\a{5}?
     ,
-        \\cat
-        \\ rep({5,5}?)
-        \\  lit(a)
+        \\rep({5,5}?)
+        \\ lit(a)
     );
 
     check(
         \\a{5,}?
     ,
-        \\cat
-        \\ rep({5,}?)
-        \\  lit(a)
+        \\rep({5,}?)
+        \\ lit(a)
     );
 
     check(
         \\a{ 5     }
     ,
-        \\cat
-        \\ rep({5,5})
-        \\  lit(a)
+        \\rep({5,5})
+        \\ lit(a)
     );
 
     // TODO: Remove unneeded concats on single items.
     check(
         \\(a)
     ,
-        \\cat
-        \\ cap
-        \\  cat
-        \\   lit(a)
+        \\cap
+        \\ cat
+        \\  lit(a)
     );
 
     check(
         \\(ab)
     ,
-        \\cat
-        \\ cap
-        \\  cat
-        \\   lit(a)
-        \\   lit(b)
+        \\cap
+        \\ cat
+        \\  lit(a)
+        \\  lit(b)
     );
 
     check(
@@ -316,74 +300,69 @@ test "regex parse tests" {
     check(
         \\(a|b)
     ,
-        \\cat
-        \\ cap
-        \\  alt
-        \\   cat
-        \\    lit(a)
-        \\   cat
-        \\    lit(b)
+        \\cap
+        \\ alt
+        \\  cat
+        \\   lit(a)
+        \\  cat
+        \\   lit(b)
     );
 
     check(
         \\(a|b|c)
     ,
-        \\cat
-        \\ cap
-        \\  alt
-        \\   cat
-        \\    lit(a)
-        \\   cat
-        \\    lit(b)
-        \\   cat
-        \\    lit(c)
+        \\cap
+        \\ alt
+        \\  cat
+        \\   lit(a)
+        \\  cat
+        \\   lit(b)
+        \\  cat
+        \\   lit(c)
     );
 
     check(
         \\(ab|bc|cd)
     ,
-        \\cat
-        \\ cap
-        \\  alt
-        \\   cat
-        \\    lit(a)
-        \\    lit(b)
-        \\   cat
-        \\    lit(b)
-        \\    lit(c)
-        \\   cat
-        \\    lit(c)
-        \\    lit(d)
+        \\cap
+        \\ alt
+        \\  cat
+        \\   lit(a)
+        \\   lit(b)
+        \\  cat
+        \\   lit(b)
+        \\   lit(c)
+        \\  cat
+        \\   lit(c)
+        \\   lit(d)
     );
 
     // TODO: Could improve this one
     check(
         \\(ab|(bc|(cd)))
     ,
-        \\cat
-        \\ cap
-        \\  alt
-        \\   cat
-        \\    lit(a)
-        \\    lit(b)
-        \\   cat
-        \\    cap
-        \\     alt
-        \\      cat
-        \\       lit(b)
-        \\       lit(c)
-        \\      cat
-        \\       cap
-        \\        cat
-        \\         lit(c)
-        \\         lit(d)
+        \\cap
+        \\ alt
+        \\  cat
+        \\   lit(a)
+        \\   lit(b)
+        \\  cat
+        \\   cap
+        \\    alt
+        \\     cat
+        \\      lit(b)
+        \\      lit(c)
+        \\     cat
+        \\      cap
+        \\       cat
+        \\        lit(c)
+        \\        lit(d)
     );
 
     check(
         \\.
     ,
-        \\cat
-        \\ dot
+        \\dot
     );
 
     // TODO: Escaping
