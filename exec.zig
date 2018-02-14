@@ -38,6 +38,9 @@ const Input = struct {
 
     pub fn isEmptyMatch(i: &const Input, n: usize, match: &const Assertion) bool {
         switch (*match) {
+            Assertion.None => {
+                return true;
+            },
             Assertion.BeginLine => {
                 return n == 0;
             },

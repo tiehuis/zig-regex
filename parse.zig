@@ -28,6 +28,8 @@ pub const Repeater = struct {
 
 /// A specific assertion type.
 pub const Assertion = enum {
+    // Always true assertion
+    None,
     // ^ anchor, beginning of text (or line depending on mode)
     BeginLine,
     // $ anchor, beginning of text (or line dependening on mode)
@@ -437,7 +439,12 @@ pub const Parser = struct {
                             Expr.Alternate => {
                                 var ra = try p.createExpr();
                                 mem.reverse(&Expr, concat.toSlice());
-                                *ra = Expr { .Concat = concat };
+
+                                if (concat.len == 1) {
+                                    *ra = *concat.toSliceConst()[0];
+                                } else {
+                                    *ra = Expr { .Concat = concat };
+                                }
 
                                 // append to the alternation stack
                                 try e.Alternate.append(ra);
@@ -460,6 +467,12 @@ pub const Parser = struct {
                                 var ra = try p.createExpr();
                                 mem.reverse(&Expr, concat.toSlice());
                                 *ra = Expr { .Concat = concat };
+
+                                if (concat.len == 1) {
+                                    *ra = *concat.toSliceConst()[0];
+                                } else {
+                                    *ra = Expr { .Concat = concat };
+                                }
 
                                 var r = try p.createExpr();
                                 *r = Expr { .Capture = ra };
@@ -485,14 +498,18 @@ pub const Parser = struct {
                     var concat = ArrayList(&Expr).init(p.allocator);
 
                     // TODO: Handle the empty alternation (||) case?
-                    // TODO: Special-case length one.
                     while (true) {
                         // would underflow, push a new alternation
                         if (p.stack.len == 0) {
                             // We need to create a single expr node for the alternation.
                             var ra = try p.createExpr();
                             mem.reverse(&Expr, concat.toSlice());
-                            *ra = Expr { .Concat = concat };
+
+                            if (concat.len == 1) {
+                                *ra = *concat.toSliceConst()[0];
+                            } else {
+                                *ra = Expr { .Concat = concat };
+                            }
 
                             var r = try p.createExpr();
                             *r = Expr { .Alternate = ArrayList(&Expr).init(p.allocator) };
@@ -508,7 +525,12 @@ pub const Parser = struct {
                             Expr.Alternate => {
                                 var ra = try p.createExpr();
                                 mem.reverse(&Expr, concat.toSlice());
-                                *ra = Expr { .Concat = concat };
+
+                                if (concat.len == 1) {
+                                    *ra = *concat.toSliceConst()[0];
+                                } else {
+                                    *ra = Expr { .Concat = concat };
+                                }
 
                                 // use the expression itself
                                 try e.Alternate.append(ra);
@@ -523,7 +545,12 @@ pub const Parser = struct {
 
                                 var ra = try p.createExpr();
                                 mem.reverse(&Expr, concat.toSlice());
-                                *ra = Expr { .Concat = concat };
+
+                                if (concat.len == 1) {
+                                    *ra = *concat.toSliceConst()[0];
+                                } else {
+                                    *ra = Expr { .Concat = concat };
+                                }
 
                                 var r = try p.createExpr();
                                 *r = Expr { .Alternate = ArrayList(&Expr).init(p.allocator) };
@@ -558,6 +585,13 @@ pub const Parser = struct {
             }
         }
 
+        // special case empty item
+        if (p.stack.len == 0) {
+            var r = try p.createExpr();
+            *r = Expr { .EmptyMatch = Assertion.None };
+            return r;
+        }
+
         // special case single item to avoid top-level concat for simple.
         if (p.stack.len == 1) {
             return p.stack.pop();
@@ -581,7 +615,12 @@ pub const Parser = struct {
                 // concat the items in reverse order and return
                 var r = try p.createExpr();
                 mem.reverse(&Expr, concat.toSlice());
-                *r = Expr { .Concat = concat };
+
+                if (concat.len == 1) {
+                    *r = *concat.toSliceConst()[0];
+                } else {
+                    *r = Expr { .Concat = concat };
+                }
                 return r;
             }
 
@@ -595,7 +634,12 @@ pub const Parser = struct {
                 Expr.Alternate => {
                     var ra = try p.createExpr();
                     mem.reverse(&Expr, concat.toSlice());
-                    *ra = Expr { .Concat = concat };
+
+                    if (concat.len == 1) {
+                        *ra = *concat.toSliceConst()[0];
+                    } else {
+                        *ra = Expr { .Concat = concat };
+                    }
 
                     // use the expression itself
                     try e.Alternate.append(ra);

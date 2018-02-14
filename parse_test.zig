@@ -142,11 +142,10 @@ fn check(re: []const u8, expected_ast: []const u8) void {
 test "regex parse tests" {
     // These are taken off rust-regex for the moment.
 
-    // TODO: This should use a special expression.
     check(
         \\
     ,
-        \\cat
+        \\empty(None)
     );
 
     check(
@@ -257,13 +256,11 @@ test "regex parse tests" {
         \\ lit(a)
     );
 
-    // TODO: Remove unneeded concats on single items.
     check(
         \\(a)
     ,
         \\cap
-        \\ cat
-        \\  lit(a)
+        \\ lit(a)
     );
 
     check(
@@ -279,22 +276,17 @@ test "regex parse tests" {
         \\a|b
     ,
         \\alt
-        \\ cat
-        \\  lit(a)
-        \\ cat
-        \\  lit(b)
+        \\ lit(a)
+        \\ lit(b)
     );
 
     check(
         \\a|b|c
     ,
         \\alt
-        \\ cat
-        \\  lit(a)
-        \\ cat
-        \\  lit(b)
-        \\ cat
-        \\  lit(c)
+        \\ lit(a)
+        \\ lit(b)
+        \\ lit(c)
     );
 
     check(
@@ -302,10 +294,8 @@ test "regex parse tests" {
     ,
         \\cap
         \\ alt
-        \\  cat
-        \\   lit(a)
-        \\  cat
-        \\   lit(b)
+        \\  lit(a)
+        \\  lit(b)
     );
 
     check(
@@ -313,12 +303,9 @@ test "regex parse tests" {
     ,
         \\cap
         \\ alt
-        \\  cat
-        \\   lit(a)
-        \\  cat
-        \\   lit(b)
-        \\  cat
-        \\   lit(c)
+        \\  lit(a)
+        \\  lit(b)
+        \\  lit(c)
     );
 
     check(
@@ -337,7 +324,6 @@ test "regex parse tests" {
         \\   lit(d)
     );
 
-    // TODO: Could improve this one
     check(
         \\(ab|(bc|(cd)))
     ,
@@ -346,17 +332,15 @@ test "regex parse tests" {
         \\  cat
         \\   lit(a)
         \\   lit(b)
-        \\  cat
-        \\   cap
-        \\    alt
+        \\  cap
+        \\   alt
+        \\    cat
+        \\     lit(b)
+        \\     lit(c)
+        \\    cap
         \\     cat
-        \\      lit(b)
         \\      lit(c)
-        \\     cat
-        \\      cap
-        \\       cat
-        \\        lit(c)
-        \\        lit(d)
+        \\      lit(d)
     );
 
     check(
