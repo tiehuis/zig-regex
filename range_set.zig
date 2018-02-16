@@ -71,8 +71,9 @@ pub fn RangeSet(comptime T: type) type {
             var merge = ranges.at(0);
 
             for (ranges.toSlice()[1..]) |r| {
-                // Overlap
-                if (r.min <= merge.max) {
+                // Overlap (or directly adjacent)
+                const upper = math.add(T, merge.max, 1) catch @maxValue(T);
+                if (r.min <= upper) {
                     merge.max = math.max(merge.max, r.max);
                 }
                 // No overlap
@@ -194,7 +195,7 @@ pub const ByteClassTemplates = struct {
     }
 
     pub fn NonDigits(a: &Allocator) !ByteClass {
-        var rs = try AlphaNumeric(a);
+        var rs = try Digits(a);
         errdefer rs.deinit();
 
         try rs.negate();
@@ -320,6 +321,15 @@ test "class merging boundary" {
     var a = RangeSet(u8).init(alloc);
     try a.addRange(Range(u8).new(20, 40));
     try a.addRange(Range(u8).new(40, 60));
+
+    debug.assert(a.ranges.len == 1);
+}
+
+test "class merging adjacent" {
+    var a = RangeSet(u8).init(alloc);
+    try a.addRange(Range(u8).new(56, 56));
+    try a.addRange(Range(u8).new(57, 57));
+    try a.addRange(Range(u8).new(58, 58));
 
     debug.assert(a.ranges.len == 1);
 }
