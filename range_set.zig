@@ -89,6 +89,13 @@ pub fn RangeSet(comptime T: type) type {
             ranges.shrink(index);
         }
 
+        // Merge two classes into one.
+        pub fn mergeClass(self: &Self, other: &const Self) !void {
+            for (other.ranges.toSliceConst()) |r| {
+                try self.addRange(r);
+            }
+        }
+
         // Inverting a class means the resulting class the contains method will match
         // the inverted set. i.e. contains(a, byte) == !contains(b, byte) if a == b.negated().
         //

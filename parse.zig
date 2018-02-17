@@ -399,12 +399,35 @@ pub const Parser = struct {
                         }
 
                         const chp = ??it.peek();
-                        if (ch == '\\') {
-                            @panic("escape in set unimplemented");
-                        }
 
-                        // read character, duplicate into a single char range
-                        var range = ByteRange { .min = chp, .max = chp };
+                        // If this is a byte-class escape, we cannot expect an '-' range after it.
+                        // Accept the following - as a literal (may be bad behaviour).
+                        //
+                        // If it is not, then we can and it is fine.
+                        var range: ByteRange = undefined;
+
+                        if (chp == '\\') {
+                            it.bump();
+
+                            // parseEscape returns a literal or byteclass so reformat
+                            var r = try p.parseEscape();
+                            // NOTE: this is bumped on loop
+                            it.index -= 1;
+                            switch (*r) {
+                                Expr.Literal => |value| {
+                                    range = ByteRange { .min = value, .max = value };
+                                },
+                                Expr.ByteClass => |vv| {
+                                    // '-' doesn't make sense following this, merge class here
+                                    // and continue next.
+                                    try class.mergeClass(vv);
+                                    continue;
+                                },
+                                else => unreachable,
+                            }
+                        } else {
+                            range = ByteRange { .min = chp, .max = chp };
+                        }
 
                         // is this a range?
                         if (it.peekNextIs('-')) {
@@ -587,7 +610,8 @@ pub const Parser = struct {
                     }
                 },
                 '\\' => {
-                    try p.parseEscape();
+                    const r = try p.parseEscape();
+                    try p.stack.append(r);
                 },
                 '^' => {
                     var r = try p.createExpr();
@@ -699,7 +723,7 @@ pub const Parser = struct {
         try p.stack.append(r);
     }
 
-    fn parseEscape(p: &Parser) !void {
+    fn parseEscape(p: &Parser) !&Expr {
         var ch: u8 = undefined;
         if (p.it.next()) |ok| {
             ch = ok;
@@ -709,55 +733,83 @@ pub const Parser = struct {
 
         switch (ch) {
             // escape chars
-            'a' => try p.parseLiteral('\x07'),
-            'f' => try p.parseLiteral('\x0c'),
-            'n' => try p.parseLiteral('\n'),
-            'r' => try p.parseLiteral('\r'),
-            't' => try p.parseLiteral('\t'),
-            'v' => try p.parseLiteral('\x0b'),
-            '\\' => try p.parseLiteral('\\'),
+            'a' => {
+                var r = try p.createExpr();
+                *r = Expr { .Literal = '\x07' };
+                return r;
+            },
+            'f' => {
+                var r = try p.createExpr();
+                *r = Expr { .Literal = '\x0c' };
+                return r;
+            },
+            'n' => {
+                var r = try p.createExpr();
+                *r = Expr { .Literal = '\n' };
+                return r;
+            },
+            'r' => {
+                var r = try p.createExpr();
+                *r = Expr { .Literal = '\r' };
+                return r;
+            },
+            't' => {
+                var r = try p.createExpr();
+                *r = Expr { .Literal = '\t' };
+                return r;
+            },
+            'v' => {
+                var r = try p.createExpr();
+                *r = Expr { .Literal = '\x0b' };
+                return r;
+            },
+            '\\' => {
+                var r = try p.createExpr();
+                *r = Expr { .Literal = '\\' };
+                return r;
+            },
             // perl codes
             's' => {
                 var s = try ByteClassTemplates.Whitespace(p.allocator);
 
                 var r = try p.createExpr();
                 *r = Expr { .ByteClass = s };
-                try p.stack.append(r);
+                return r;
             },
             'S' => {
                 var s = try ByteClassTemplates.NonWhitespace(p.allocator);
 
                 var r = try p.createExpr();
                 *r = Expr { .ByteClass = s };
-                try p.stack.append(r);
+                return r;
             },
             'w' => {
                 var s = try ByteClassTemplates.AlphaNumeric(p.allocator);
 
                 var r = try p.createExpr();
                 *r = Expr { .ByteClass = s };
-                try p.stack.append(r);
+                return r;
             },
             'W' => {
                 var s = try ByteClassTemplates.NonAlphaNumeric(p.allocator);
 
                 var r = try p.createExpr();
                 *r = Expr { .ByteClass = s };
-                try p.stack.append(r);
+                return r;
             },
             'd' => {
                 var s = try ByteClassTemplates.Digits(p.allocator);
 
                 var r = try p.createExpr();
                 *r = Expr { .ByteClass = s };
-                try p.stack.append(r);
+                return r;
             },
             'D' => {
                 var s = try ByteClassTemplates.NonDigits(p.allocator);
 
                 var r = try p.createExpr();
                 *r = Expr { .ByteClass = s };
-                try p.stack.append(r);
+                return r;
             },
             else => @panic("unknown escape code"),
         }

@@ -51,28 +51,26 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
 
 test "regex sanity tests" {
     // Taken from tiny-regex-c
-    // TODO: Literals in character classes.
-    // TODO: Escaped '\' character.
 
     check("\\d", "5", true);
     check("\\w+", "hej", true);
     check("\\s", "\t \n", true);
     check("\\S", "\t \n", false);
-    //check("[\\s]", "\t \n", true);
-    //check("[\\S]", "\t \n", false);
+    check("[\\s]", "\t \n", true);
+    check("[\\S]", "\t \n", false);
     check("\\D", "5", false);
     check("\\W+", "hej", false);
     check("[0-9]+", "12345", true);
     check("\\D", "hej", true);
     check("\\d", "hej", false);
-    //check("[^\\w]", "\\", true);
-    //check("[\\W]", "\\", true);
-    //check("[\\w]", "\\", false);
-    //check("[^\\d]", "d", true);
-    //check("[\\d]", "d", false);
-    //check("[^\\D]", "d", false);
-    //check("[\\D]", "d", true);
-    //check("^.*\\\\.*$","c:\\Tools", true);
+    check("[^\\w]", "\\", true);
+    check("[\\W]", "\\", true);
+    check("[\\w]", "\\", false);
+    check("[^\\d]", "d", true);
+    check("[\\d]", "d", false);
+    check("[^\\D]", "d", false);
+    check("[\\D]", "d", true);
+    check("^.*\\\\.*$","c:\\Tools", true);
     //check("^[\\+-]*[\\d]+$", "+27", true);
     check("[abc]", "1c2", true);
     check("[abc]", "1C2", false);
@@ -84,9 +82,9 @@ test "regex sanity tests" {
     check("[a-h]+", "ABCDEFGH", false);
     check("[A-H]+", "ABCDEFGH", true);
     check("[A-H]+", "abcdefgh", false);
-    //check("[^\\s]+", "abc def", true);
+    check("[^\\s]+", "abc def", true);
     check("[^fc]+", "abc def", true);
-    //check("[^d\\sf]+", "abc def", true);
+    check("[^d\\sf]+", "abc def", true);
     check("\n", "abc\ndef", true);
     //check("b.\\s*\n", "aa\r\nbb\r\ncc\r\n\r\n", true);
     check(".*c", "abcabc", true);
@@ -102,10 +100,10 @@ test "regex sanity tests" {
     check("[Hh]ello [Ww]orld\\s*[!]?", "Hello world!   ", true);
     check("[Hh]ello [Ww]orld\\s*[!]?", "Hello world  !", true);
     check("[Hh]ello [Ww]orld\\s*[!]?", "hello World    !", true);
-    //check("[^\\w][^-1-4]", ")T", true);
-    //check("[^\\w][^-1-4]", ")^", true);
-    //check("[^\\w][^-1-4]", "*)", true);
-    //check("[^\\w][^-1-4]", "!.", true);
-    //check("[^\\w][^-1-4]", " x", true);
-    //check("[^\\w][^-1-4]", "$b", true);
+    check("[^\\w][^-1-4]", ")T", true);
+    check("[^\\w][^-1-4]", ")^", true);
+    check("[^\\w][^-1-4]", "*)", true);
+    check("[^\\w][^-1-4]", "!.", true);
+    check("[^\\w][^-1-4]", " x", true);
+    check("[^\\w][^-1-4]", "$b", true);
 }
