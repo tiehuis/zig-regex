@@ -68,7 +68,7 @@ pub const Inst = union(enum) {
             Inst.ByteClass => |x| {
                 debug.warn("range {}, ", x.goto1);
                 for (x.class.ranges.toSliceConst()) |r|
-                    debug.warn("[{c}-{c}]", r.min, r.max);
+                    debug.warn("[{}-{}]", r.min, r.max);
                 debug.warn("\n");
             },
             Inst.AnyCharNotNL => |x| {
@@ -116,7 +116,7 @@ const InstHole = union(enum) {
             InstHole.ByteClass => |x| {
                 debug.warn("(");
                 for (x.ranges.toSliceConst()) |r|
-                    debug.warn("[{c}-{c}]", r.min, r.max);
+                    debug.warn("[{}-{}]", r.min, r.max);
                 debug.warn(")\n");
             },
             InstHole.AnyCharNotNL, InstHole.Split => {
@@ -580,20 +580,3 @@ pub const Compiler = struct {
         c.fill(hole, c.insts.len);
     }
 };
-
-test "compile" {
-    const a = "a{3,}b{4}c{3,4}[0-9]$";
-    debug.warn("\n{}\n", a);
-
-    var p = Parser.init(debug.global_allocator);
-    const expr = try p.parse(a);
-
-    expr.dump();
-
-    var c = Compiler.init(debug.global_allocator);
-    const bytecode = try c.compile(expr);
-
-    bytecode.dump();
-
-    // Run it on an appropriate vm!
-}

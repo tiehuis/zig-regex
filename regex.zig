@@ -22,7 +22,6 @@
 // [ ] \b
 // [ ] escape sequences
 
-
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const debug = std.debug;
@@ -97,17 +96,3 @@ pub const Regex = struct {
     // where does the string match?
     // TODO: Requires capture support.
 };
-
-test "regex" {
-    var alloc = debug.global_allocator;
-
-    var re = Regex.mustCompile(alloc, "ab{1}c+d+.?");
-
-    debug.assert((try re.match("abcd")) == true);
-    debug.assert((try re.match("abcccccd")) == true);
-    debug.assert((try re.match("abcdddddZ")) == true);
-    debug.assert((try re.match("abd")) == false);
-
-    debug.assert((try re.match("____abcd")) == false);
-    debug.assert((try re.partialMatch("_____abcd")) == true);
-}

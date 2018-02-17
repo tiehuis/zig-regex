@@ -188,6 +188,15 @@ const StringIterator = struct {
         }
     }
 
+    // Return true if the next character in the stream is `ch`.
+    pub fn peekNextIs(it: &const Self, ch: u8) bool {
+        if (it.peekAhead(1)) |ok_ch| {
+            return ok_ch == ch;
+        } else {
+            return false;
+        }
+    }
+
     // Look at the next character in the stream without advancing.
     pub fn peek(it: &const Self) ?u8 {
         return it.peekAhead(0);
@@ -244,7 +253,9 @@ pub const ParseError = error {
     StackUnderflow,
     InvalidRepeatRange,
     UnclosedRepeat,
+    UnclosedBrackets,
     ExcessiveRepeatCount,
+    OpenEscapeCode,
 };
 
 const repeat_max_length = 1000;
@@ -383,12 +394,21 @@ pub const Parser = struct {
                     }
 
                     while (!it.peekIs(']')) : (it.bump()) {
+                        if (it.peek() == null) {
+                            return error.UnclosedBrackets;
+                        }
+
+                        const chp = ??it.peek();
+                        if (ch == '\\') {
+                            @panic("escape in set unimplemented");
+                        }
+
                         // read character, duplicate into a single char range
-                        var range = ByteRange { .min = ??it.peek(), .max = ??it.peek() };
-                        it.bump();
+                        var range = ByteRange { .min = chp, .max = chp };
 
                         // is this a range?
-                        if (it.peekIs('-')) {
+                        if (it.peekNextIs('-')) {
+                            it.bump();
                             it.bump();
                             if (it.peekIs(']')) {
                                 return error.UnmatchedByteClass;
@@ -680,9 +700,14 @@ pub const Parser = struct {
     }
 
     fn parseEscape(p: &Parser) !void {
-        p.it.bump();
+        var ch: u8 = undefined;
+        if (p.it.next()) |ok| {
+            ch = ok;
+        } else {
+            return error.OpenEscapeCode;
+        }
 
-        switch (??p.it.next()) {
+        switch (ch) {
             // escape chars
             'a' => try p.parseLiteral('\x07'),
             'f' => try p.parseLiteral('\x0c'),
@@ -690,6 +715,7 @@ pub const Parser = struct {
             'r' => try p.parseLiteral('\r'),
             't' => try p.parseLiteral('\t'),
             'v' => try p.parseLiteral('\x0b'),
+            '\\' => try p.parseLiteral('\\'),
             // perl codes
             's' => {
                 var s = try ByteClassTemplates.Whitespace(p.allocator);

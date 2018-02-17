@@ -177,22 +177,3 @@ pub const VmBacktrack = struct {
         return false;
     }
 };
-
-test "exec backtrack" {
-    var p = Parser.init(debug.global_allocator);
-    const expr = try p.parse("^abc+d+.?");
-
-    expr.dump();
-
-    var c = Compiler.init(debug.global_allocator);
-    const bytecode = try c.compile(expr);
-
-    bytecode.dump();
-
-    const engine = VmBacktrack{};
-
-    debug.assert((try engine.exec(bytecode, 0, "abcd")) == true);
-    debug.assert((try engine.exec(bytecode, 0, "abccccd")) == true);
-    debug.assert((try engine.exec(bytecode, 0, "abcdddddZ")) == true);
-    debug.assert((try engine.exec(bytecode, 0, "abd")) == false);
-}

@@ -154,6 +154,8 @@ pub const ByteClassTemplates = struct {
 
         // \t, \n, \v, \f, \r
         try rs.addRange(ByteRange.new('\x09', '\x0D'));
+        // ' '
+        try rs.addRange(ByteRange.new(' ', ' '));
 
         return rs;
     }
