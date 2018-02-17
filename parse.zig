@@ -323,6 +323,13 @@ pub const Parser = struct {
         return r;
     }
 
+    fn isPunctuation(c: u8) bool {
+        return switch (c) {
+            '\\', '.', '+', '*', '?', '(', ')', '|', '[', ']', '{', '}', '^', '$', '-' => true,
+            else => false,
+        };
+    }
+
     pub fn parse(p: &Parser, re: []const u8) !&Expr {
         p.it = StringIterator.init(re);
         // Shorter alias
@@ -433,11 +440,13 @@ pub const Parser = struct {
                         if (it.peekNextIs('-')) {
                             it.bump();
                             it.bump();
-                            if (it.peekIs(']')) {
-                                return error.UnmatchedByteClass;
-                            }
 
-                            range.max = ??it.peek();
+                            if (it.peekIs(']')) {
+                                // treat the '-' as a literal instead
+                                it.index -= 1;
+                            } else {
+                                range.max = ??it.peek();
+                            }
                         }
 
                         try class.addRange(range);
@@ -731,6 +740,12 @@ pub const Parser = struct {
             return error.OpenEscapeCode;
         }
 
+        if (isPunctuation(ch)) {
+            var r = try p.createExpr();
+            *r = Expr { .Literal = ch };
+            return r;
+        }
+
         switch (ch) {
             // escape chars
             'a' => {
@@ -761,11 +776,6 @@ pub const Parser = struct {
             'v' => {
                 var r = try p.createExpr();
                 *r = Expr { .Literal = '\x0b' };
-                return r;
-            },
-            '\\' => {
-                var r = try p.createExpr();
-                *r = Expr { .Literal = '\\' };
                 return r;
             },
             // perl codes

@@ -71,7 +71,7 @@ test "regex sanity tests" {
     check("[^\\D]", "d", false);
     check("[\\D]", "d", true);
     check("^.*\\\\.*$","c:\\Tools", true);
-    //check("^[\\+-]*[\\d]+$", "+27", true);
+    check("^[\\+-]*[\\d]+$", "+27", true);
     check("[abc]", "1c2", true);
     check("[abc]", "1C2", false);
     check("[1-5]+", "0123456789", true);
