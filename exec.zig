@@ -151,6 +151,9 @@ pub const VmBacktrack = struct {
                         pc = c.goto1;
                         sp += 1;
                     },
+                    Inst.SavePosition, Inst.RestorePosition => {
+                        // ignore captures,
+                    },
                     Inst.Match => {
                         return true;
                     },

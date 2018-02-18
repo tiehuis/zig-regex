@@ -34,6 +34,11 @@ const InstEmptyMatch = struct {
     assertion: Assertion,
 };
 
+const InstCapture = struct {
+    goto1: usize,
+    index: usize,
+};
+
 // Represents instructions for the VM.
 pub const Inst = union(enum) {
     // Match the specified character.
@@ -56,6 +61,9 @@ pub const Inst = union(enum) {
 
     // Split execution, spawing a new thread and continuing in lockstep
     Split: InstSplit,
+
+    RestorePosition: InstCapture,
+    SavePosition: InstCapture,
 
     pub fn dump(s: &const Inst) void {
         switch (*s) {
@@ -83,6 +91,12 @@ pub const Inst = union(enum) {
             Inst.Split => |x| {
                 debug.warn("split {}, {}\n", x.goto1, x.goto2);
             },
+            Inst.RestorePosition => |x| {
+                debug.warn("restore {}, {}\n", x.index, x.goto1);
+            },
+            Inst.SavePosition => |x| {
+                debug.warn("save {}, {}\n", x.index, x.goto1);
+            },
         }
     }
 };
@@ -103,6 +117,8 @@ const InstHole = union(enum) {
     Split1: usize,
     // Split with a filled second branch
     Split2: usize,
+    // Restore a capture
+    RestorePosition: usize,
 
     pub fn dump(s: &const InstHole) void {
         debug.warn("{}", @tagName(*s));
@@ -126,6 +142,9 @@ const InstHole = union(enum) {
                 debug.warn("({})\n", x);
             },
             InstHole.Split2 => |x| {
+                debug.warn("({})\n", x);
+            },
+            InstHole.RestorePosition => |x| {
                 debug.warn("({})\n", x);
             },
         }
@@ -173,6 +192,9 @@ const PartialInst = union(enum) {
                     // 2nd was already filled
                     InstHole.Split2 => |split| {
                         comp = Inst { .Split = InstSplit { .goto1 = i, .goto2 = split }};
+                    },
+                    InstHole.RestorePosition => |code| {
+                        comp = Inst { .RestorePosition = InstCapture { .goto1 = i, .index = code }};
                     },
                 }
 
@@ -237,16 +259,25 @@ pub const Compiler = struct {
     // Stores all partial instructions
     insts: ArrayList(PartialInst),
     allocator: &Allocator,
+    // Capture state
+    capture_index: usize,
 
     pub fn init(a: &Allocator) Compiler {
         return Compiler {
             .insts = ArrayList(PartialInst).init(a),
             .allocator = a,
+            .capture_index = 0,
         };
     }
 
     pub fn deinit(c: &Compiler) void {
         c.insts.deinit();
+    }
+
+    fn nextCaptureIndex(c: &Compiler) usize {
+        const s = c.capture_index;
+        c.capture_index += 1;
+        return s;
     }
 
     // Compile the regex expression
@@ -391,8 +422,23 @@ pub const Compiler = struct {
                 return Patch { .hole = hole, .entry = entry };
             },
             Expr.Capture => |subexpr| {
-                // TODO: save instruction
-                return c.compileInternal(subexpr);
+                // 1: save 1, 2
+                // 2: subexpr
+                // 3: restore 1, 4
+                // ...
+
+                // Create a partial instruction with a hole outgoing at the current location.
+                const entry = c.insts.len;
+
+                const index = c.nextCaptureIndex();
+
+                try c.pushCompiled(Inst { .SavePosition = InstCapture { .goto1 = entry + 1, .index = index }});
+                const p = try c.compileInternal(subexpr);
+                c.fillToNext(p.hole);
+
+                const h = try c.pushHole(InstHole { .RestorePosition = index });
+
+                return Patch { .hole = h, .entry = entry };
             },
             Expr.Alternate => |subexprs| {
                 // Alternation with one path does not make sense
