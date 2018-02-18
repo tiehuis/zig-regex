@@ -14,7 +14,7 @@ Note: This is still a work in progress and many things still need to be done.
 const debug = @import("std").debug;
 const Regex = @import("regex.zig").Regex;
 
-test "example" {/
+test "example" {
     var re = try Regex.compile(debug.global_allocator, "\\w+");
 
     debug.assert(try re.match("hej") == true);
