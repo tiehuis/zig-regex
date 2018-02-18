@@ -251,9 +251,9 @@ pub const Compiler = struct {
 
     // Compile the regex expression
     pub fn compile(c: &Compiler, expr: &const Expr) !Prog {
-        const patch = try c.compile_internal(expr);
+        const patch = try c.compileInternal(expr);
         // fill any holes to end at the next instruction which will be a match
-        c.fill_to_next(patch.hole);
+        c.fillToNext(patch.hole);
         try c.insts.append(PartialInst { .Compiled = Inst.Match } );
 
         var p = ArrayList(Inst).init(c.allocator);
@@ -292,56 +292,56 @@ pub const Compiler = struct {
         return Prog.init(p.toOwnedSlice(), fragment_start);
     }
 
-    fn compile_internal(c: &Compiler, expr: &const Expr) Allocator.Error!Patch {
+    fn compileInternal(c: &Compiler, expr: &const Expr) Allocator.Error!Patch {
         switch (*expr) {
             Expr.Literal => |lit| {
-                const h = try c.push_hole(InstHole { .Char = lit });
+                const h = try c.pushHole(InstHole { .Char = lit });
                 return Patch { .hole = h, .entry = c.insts.len - 1 };
             },
             Expr.ByteClass => |classes| {
                 // Similar, we use a special instruction.
-                const h = try c.push_hole(InstHole { .ByteClass = classes });
+                const h = try c.pushHole(InstHole { .ByteClass = classes });
                 return Patch { .hole = h, .entry = c.insts.len - 1 };
             },
             Expr.AnyCharNotNL => {
-                const h = try c.push_hole(InstHole.AnyCharNotNL);
+                const h = try c.pushHole(InstHole.AnyCharNotNL);
                 return Patch { .hole = h, .entry = c.insts.len - 1 };
             },
             Expr.EmptyMatch => |assertion| {
-                const h = try c.push_hole(InstHole { .EmptyMatch = assertion });
+                const h = try c.pushHole(InstHole { .EmptyMatch = assertion });
                 return Patch { .hole = h, .entry = c.insts.len - 1 };
             },
             Expr.Repeat => |repeat| {
                 // Case 1: *
                 if (repeat.min == 0 and repeat.max == null) {
-                    return c.compile_star(repeat.subexpr, repeat.greedy);
+                    return c.compileStar(repeat.subexpr, repeat.greedy);
                 }
                 // Case 2: +
                 else if (repeat.min == 1 and repeat.max == null) {
-                    return c.compile_plus(repeat.subexpr, repeat.greedy);
+                    return c.compilePlus(repeat.subexpr, repeat.greedy);
                 }
                 // Case 3: ?
                 else if (repeat.min == 0 and repeat.max != null and (??repeat.max) == 1) {
-                    return c.compile_question(repeat.subexpr, repeat.greedy);
+                    return c.compileQuestion(repeat.subexpr, repeat.greedy);
                 }
                 // Case 4: {m,}
                 else if (repeat.max == null) {
                     // e{2,} => eee*
 
                     // fixed min concatenation
-                    const p = try c.compile_internal(repeat.subexpr);
+                    const p = try c.compileInternal(repeat.subexpr);
                     var hole = p.hole;
                     const entry = p.entry;
 
                     var i: usize = 0;
                     while (i < repeat.min) : (i += 1) {
-                        const ep = try c.compile_internal(repeat.subexpr);
+                        const ep = try c.compileInternal(repeat.subexpr);
                         c.fill(hole, ep.entry);
                         hole = ep.hole;
                     }
 
                     // add final e* infinite capture
-                    const st = try c.compile_star(repeat.subexpr, repeat.greedy);
+                    const st = try c.compileStar(repeat.subexpr, repeat.greedy);
                     c.fill(hole, st.entry);
 
                     return Patch { .hole = st.hole, .entry = entry };
@@ -349,20 +349,20 @@ pub const Compiler = struct {
                 // Case 5: {m,n} and {m}
                 else {
                     // e{3,6} => eee?e?e?e?
-                    const p = try c.compile_internal(repeat.subexpr);
+                    const p = try c.compileInternal(repeat.subexpr);
                     var hole = p.hole;
                     const entry = p.entry;
 
                     var i: usize = 1;
                     while (i < repeat.min) : (i += 1) {
-                        const ep = try c.compile_internal(repeat.subexpr);
+                        const ep = try c.compileInternal(repeat.subexpr);
                         c.fill(hole, ep.entry);
                         hole = ep.hole;
                     }
 
                     // repeated optional concatenations
                     while (i < ??repeat.max) : (i += 1) {
-                        const ep = try c.compile_question(repeat.subexpr, repeat.greedy);
+                        const ep = try c.compileQuestion(repeat.subexpr, repeat.greedy);
                         c.fill(hole, ep.entry);
                         hole = ep.hole;
                     }
@@ -375,13 +375,13 @@ pub const Compiler = struct {
                 var f = subexprs.toSliceConst()[0];
 
                 // First patch
-                const p = try c.compile_internal(f);
+                const p = try c.compileInternal(f);
                 var hole = p.hole;
                 const entry = p.entry;
 
                 // tie together patches from concat arguments
                 for (subexprs.toSliceConst()[1..]) |e| {
-                    const ep = try c.compile_internal(e);
+                    const ep = try c.compileInternal(e);
                     // fill the previous patch hole to the current entry
                     c.fill(hole, ep.entry);
                     // current hole is now the next fragment
@@ -392,7 +392,7 @@ pub const Compiler = struct {
             },
             Expr.Capture => |subexpr| {
                 // TODO: save instruction
-                return c.compile_internal(subexpr);
+                return c.compileInternal(subexpr);
             },
             Expr.Alternate => |subexprs| {
                 // Alternation with one path does not make sense
@@ -421,22 +421,22 @@ pub const Compiler = struct {
 
                 // This compiles one branch of the split at a time.
                 for (subexprs.toSliceConst()[0..subexprs.len-1]) |subexpr| {
-                    c.fill_to_next(last_hole);
+                    c.fillToNext(last_hole);
 
                     // next entry will be a sub-expression
                     //
                     // We fill the second part of this hole on the next sub-expression.
-                    *last_hole = try c.push_hole(InstHole { .Split1 = c.insts.len + 1 });
+                    *last_hole = try c.pushHole(InstHole { .Split1 = c.insts.len + 1 });
 
                     // compile the subexpression
-                    const p = try c.compile_internal(subexpr);
+                    const p = try c.compileInternal(subexpr);
 
                     // store outgoing hole for the subexpression
                     try holes.append(p.hole);
                 }
 
                 // one entry left, push a sub-expression so we end with a double-subexpression.
-                const p = try c.compile_internal(subexprs.toSliceConst()[subexprs.len-1]);
+                const p = try c.compileInternal(subexprs.toSliceConst()[subexprs.len-1]);
                 c.fill(last_hole, p.entry);
 
                 // push the last sub-expression hole
@@ -453,9 +453,7 @@ pub const Compiler = struct {
         return Patch { .hole = Hole.None, .entry = c.insts.len };
     }
 
-    ////////////////////
-    // Compile Helpers
-    fn compile_star(c: &Compiler, expr: &Expr, greedy: bool) !Patch {
+    fn compileStar(c: &Compiler, expr: &Expr, greedy: bool) !Patch {
         // 1: split 2, 4
         // 2: subexpr
         // 3: jmp 1
@@ -476,31 +474,31 @@ pub const Compiler = struct {
                 InstHole { .Split2 = c.insts.len + 1 }
             ;
 
-        const h = try c.push_hole(partial_inst);
+        const h = try c.pushHole(partial_inst);
 
         // compile the subexpression
-        const p = try c.compile_internal(expr);
+        const p = try c.compileInternal(expr);
 
         // sub-expression to jump
-        c.fill_to_next(p.hole);
+        c.fillToNext(p.hole);
 
         // Jump back to the entry split
-        try c.push_compiled(Inst { .Jump = entry });
+        try c.pushCompiled(Inst { .Jump = entry });
 
         // Return a filled patch set to the first split instruction.
         return Patch { .hole = h, .entry = entry };
     }
 
-    fn compile_plus(c: &Compiler, expr: &Expr, greedy: bool) !Patch {
+    fn compilePlus(c: &Compiler, expr: &Expr, greedy: bool) !Patch {
         // 1: subexpr
         // 2: split 1, 3
         // 3: ...
         //
         // NOTE: We can do a lookahead on non-greedy here to improve performance.
-        const p = try c.compile_internal(expr);
+        const p = try c.compileInternal(expr);
 
         // Create the next expression in place
-        c.fill_to_next(p.hole);
+        c.fillToNext(p.hole);
 
         // split 3, 1 (non-greedy)
         // Point back to the upcoming next instruction (will always be filled).
@@ -511,13 +509,13 @@ pub const Compiler = struct {
                 InstHole { .Split2 = p.entry }
             ;
 
-        const h = try c.push_hole(partial_inst);
+        const h = try c.pushHole(partial_inst);
 
         // split to the next instruction
         return Patch { .hole = h, .entry = p.entry };
     }
 
-    fn compile_question(c: &Compiler, expr: &Expr, greedy: bool) !Patch {
+    fn compileQuestion(c: &Compiler, expr: &Expr, greedy: bool) !Patch {
         // 1: split 2, 3
 
         // 2: subexpr
@@ -531,10 +529,10 @@ pub const Compiler = struct {
                 InstHole { .Split2 = c.insts.len + 1 }
             ;
 
-        const h = try c.push_hole(partial_inst);
+        const h = try c.pushHole(partial_inst);
 
         // compile the subexpression
-        const p = try c.compile_internal(expr);
+        const p = try c.compileInternal(expr);
 
         var holes = ArrayList(Hole).init(c.allocator);
         errdefer holes.deinit();
@@ -545,23 +543,17 @@ pub const Compiler = struct {
         return Patch { .hole = Hole { .Many = holes }, .entry = p.entry - 1 };
     }
 
-    ////////////////////
-    // Instruction Helpers
-
     // Push a compiled instruction directly onto the stack.
-    fn push_compiled(c: &Compiler, i: &const Inst) !void {
+    fn pushCompiled(c: &Compiler, i: &const Inst) !void {
         try c.insts.append(PartialInst { .Compiled = *i });
     }
 
     // Push a instruction with a hole onto the set
-    fn push_hole(c: &Compiler, i: &const InstHole) !Hole {
+    fn pushHole(c: &Compiler, i: &const InstHole) !Hole {
         const h = c.insts.len;
         try c.insts.append(PartialInst { .Uncompiled = *i });
         return Hole { .One = h };
     }
-
-    ////////////////////
-    // Patch filling
 
     // Patch an individual hole with the specified output address.
     fn fill(c: &Compiler, hole: &const Hole, goto1: InstPtr) void {
@@ -576,7 +568,7 @@ pub const Compiler = struct {
     }
 
     // Patch a hole to point to the next instruction
-    fn fill_to_next(c: &Compiler, hole: &const Hole) void {
+    fn fillToNext(c: &Compiler, hole: &const Hole) void {
         c.fill(hole, c.insts.len);
     }
 };
