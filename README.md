@@ -2,11 +2,11 @@ An automation-based regex implementation for [zig](http://ziglang.org/).
 
 Note: This is still a work in progress and many things still need to be done.
 
- [ ] - UTF-8 support
- [ ] - More tests (plus some automated tests/fuzzing)
- [ ] - Add a PikeVM implementation
- [ ] - Capture group support
- [ ] - Literal optimizations and just general performance improvements.
+ - [ ] UTF-8 support
+ - [ ] More tests (plus some automated tests/fuzzing)
+ - [ ] Add a PikeVM implementation
+ - [ ] Capture group support
+ - [ ] Literal optimizations and just general performance improvements.
 
 ## Usage
 
