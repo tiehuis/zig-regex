@@ -58,11 +58,13 @@ leftmost and does not have to be anchored to the start of `input`.
 ---
 
 ```
-pub fn captures(re: &const Regex, input: []const u8) !ArrayList([]const u8)
+pub fn captures(re: &const Regex, input: []const u8) !?ArrayList([]const u8)
 ```
 
 Match a compiled regex against some input. Returns a list of all matching
 slices in the regex with the first (0-index) being the entire regex.
+
+If no match was found, null is returned.
 
 ---
 

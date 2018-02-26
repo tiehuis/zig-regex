@@ -103,18 +103,18 @@ pub const Regex = struct {
     // where does the string match in the regex?
     //
     // the 0 capture is the entire match.
-    pub fn captures(re: &Regex, input: []const u8) !ArrayList([]const u8) {
+    pub fn captures(re: &Regex, input: []const u8) !?ArrayList([]const u8) {
         const r = try re.engine.exec(re.compiled, re.compiled.find_start, input, re.slots[0..]);
+
+        if (!r) {
+            return null;
+        }
 
         // transform the slot matches into slice entries. Every [2*k, 2*k+1] set should either be
         // both non-null or null.
         var s = ArrayList([]const u8).init(re.compiler.allocator);
         errdefer s.deinit();
 
-        if (!r) {
-            // empty captures
-            return s;
-        }
 
         // TODO: Iterator interface plus ensure all captures are cleared on failure
         var i: usize = 0;
