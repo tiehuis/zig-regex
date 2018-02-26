@@ -2,10 +2,10 @@ An automation-based regex implementation for [zig](http://ziglang.org/).
 
 Note: This is still a work in progress and many things still need to be done.
 
+ - [x] Capture group support
  - [ ] UTF-8 support
  - [ ] More tests (plus some automated tests/fuzzing)
  - [ ] Add a PikeVM implementation
- - [ ] Capture group support
  - [ ] Literal optimizations and just general performance improvements.
 
 ## Usage
@@ -57,6 +57,14 @@ leftmost and does not have to be anchored to the start of `input`.
 
 ---
 
+```
+pub fn captures(re: &const Regex, input: []const u8) !ArrayList([]const u8)
+```
+
+Match a compiled regex against some input. Returns a list of all matching
+slices in the regex with the first (0-index) being the entire regex.
+
+---
 
 ## References
 

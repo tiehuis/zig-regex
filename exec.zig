@@ -68,115 +68,172 @@ const Input = struct {
     }
 };
 
+const SaveRestore = struct {
+    // slot position to restore
+    slot: usize,
+    // position to store in slot
+    last_pos: usize,
+};
+
+const Thread = struct {
+    // instruction pointer
+    ip: usize,
+    // position in input string
+    pos: usize,
+};
+
+const Job = union(enum) {
+    Thread: Thread,
+    SaveRestore: SaveRestore,
+};
+
+// This is bounded and only used for small compiled regexes. It is not quadratic since pre-seen
+// nodes are cached across threads.
 pub const VmBacktrack = struct {
-    // A thread of execution in the vm.
-    const Thread = struct {
-        // Pointer to the current instruction
-        pc: usize,
-        // Pointer to the position in the string we are searching
-        sp: usize,
+    const Self = this;
 
-        pub fn init(pc: usize, sp: usize) Thread {
-            return Thread { .pc = pc, .sp = sp };
-        }
-    };
+    // pending jobs
+    jobs: ArrayList(Job),
 
-    pub fn exec(engine: &const VmBacktrack, prog: &const Prog, start: usize, input: []const u8) !bool {
-        const max_thread = 1000;
+    // cache (we can bound this visited bitset since we bound when we use the backtracking engine.
+    visited: [512]u32,
+    // end is the last index of the input and sets our strides for the bitset
+    end: usize,
 
-        var ready: [max_thread]Thread = undefined;
-        var ready_count: usize = 0;
+    // cached entries across invocation
+    prog: &const Prog,
+    input: []const u8,
+    slots: []?usize,
 
-        // queue initial thread
-        ready[0] = Thread.init(start, 0);
-        ready_count = 1;
+    pub fn init(allocator: &Allocator) Self {
+        return Self {
+            .jobs = ArrayList(Job).init(allocator),
+            .visited = undefined,
+            .end = undefined,
+            .prog = undefined,
+            .input = undefined,
+            .slots = undefined,
+        };
+    }
 
-        const inp = Input.init(input);
+    pub fn exec(self: &Self, prog: &const Prog, prog_start: usize, input: []const u8, slots: []?usize) !bool {
+        // we enforce this by never choosing this engine in the case we exceed this requirement
+        debug.assert((prog.insts.len + 1) * (input.len + 1) < 512 * 32);
 
-        while (ready_count > 0) {
-            // Pop the thread
-            ready_count -= 1;
+        self.end = input.len;
+        self.prog = prog;
+        self.input = input;
+        // saved capture locations
+        self.slots = slots;
 
-            var pc = ready[ready_count].pc;
-            var sp = ready[ready_count].sp;
+        // reset the visited bitset
+        mem.set(u32, self.visited[0..], 0);
 
-            // single thread execution
-            while (true) {
-                switch (prog.insts[pc]) {
-                    Inst.Char => |ch| {
-                        if (sp >= inp.len) {
-                            break;
-                        }
-                        if (ch.c != inp.at(sp)) {
-                            // no match, kill the thread
-                            break;
-                        }
+        const t = Job { .Thread = Thread { .ip = prog_start, .pos = 0 }};
+        try self.jobs.append(t);
 
-                        pc = ch.goto1;
-                        sp += 1;
-                    },
-                    Inst.EmptyMatch => |em| {
-                        if (sp >= inp.len) {
-                            break;
-                        }
-                        if (!inp.isEmptyMatch(sp, em.assertion)) {
-                            // no match, kill thread
-                            break;
-                        }
-
-                        pc = em.goto1;
-                        // do not advance sp
-                    },
-                    Inst.ByteClass => |inst| {
-                        if (sp >= inp.len) {
-                            break;
-                        }
-                        if (!inst.class.contains(input[sp])) {
-                            // no match in any range, kill the thread
-                            break;
-                        }
-
-                        pc = inst.goto1;
-                        sp += 1;
-                    },
-                    Inst.AnyCharNotNL => |c| {
-                        if (sp >= input.len) {
-                            break;
-                        }
-                        if (input[sp] == '\n') {
-                            // kill thread
-                            break;
-                        }
-
-                        pc = c.goto1;
-                        sp += 1;
-                    },
-                    Inst.SavePosition, Inst.RestorePosition => {
-                        // ignore captures,
-                    },
-                    Inst.Match => {
+        while (self.jobs.popOrNull()) |job| {
+            switch (job) {
+                Job.Thread => |thread| {
+                    if (try self.step(thread.ip, thread.pos)) {
                         return true;
-                    },
-                    Inst.Jump => |to| {
-                        pc = to;
-                    },
-                    Inst.Split => |split| {
-                        // goto1 and goto2 to check
-                        if (ready_count >= max_thread) {
-                            return error.RegexpOverflow;
-                        }
-
-                        // queue a thread
-                        ready[ready_count] = Thread.init(split.goto2, sp);
-                        ready_count += 1;
-
-                        // try the first branch in the current thread first
-                        pc = split.goto1;
-                    },
-                }
+                    }
+                },
+                Job.SaveRestore => |save| {
+                    if (save.slot < self.slots.len) {
+                        self.slots[save.slot] = save.last_pos;
+                    }
+                },
             }
         }
 
         return false;
+    }
+
+    // step through the current active thread at the specific position
+    fn step(self: &Self, ip_: usize, pos_: usize) !bool {
+        // We don't need to create threads for linear actions (i.e. match) and can get by with
+        // just modifying the pc. We only need to create threads on the actual splits.
+        var ip = ip_;
+        var pos = pos_;
+        var inp = Input.init(self.input);
+
+        while (true) {
+            if (!self.shouldVisit(ip, pos)) {
+                return false;
+            }
+
+            switch (self.prog.insts[ip]) {
+                Inst.Char => |ch| {
+                    if (pos >= inp.len or ch.c != inp.at(pos)) {
+                        return false;
+                    }
+                    ip = ch.goto1;
+                    pos += 1;
+                },
+                Inst.EmptyMatch => |em| {
+                    if (pos >= inp.len or !inp.isEmptyMatch(pos, em.assertion)) {
+                        return false;
+                    }
+                    ip = em.goto1;
+                },
+                Inst.ByteClass => |inst| {
+                    if (pos >= inp.len or !inst.class.contains(inp.at(pos))) {
+                        return false;
+                    }
+                    ip = inst.goto1;
+                    pos += 1;
+                },
+                Inst.AnyCharNotNL => |c| {
+                    if (pos >= inp.len or inp.at(pos) == '\n') {
+                        return false;
+                    }
+                    ip = c.goto1;
+                    pos += 1;
+                },
+                Inst.Save => |slot| {
+                    // We can save an existing match by creating a job which will run on this thread
+                    // failing. This will reset to the old match before any subsequent splits in
+                    // this thread.
+                    if (self.slots[slot.index]) |last_pos| {
+                        const job = Job { .SaveRestore = SaveRestore {
+                            .slot = slot.index,
+                            .last_pos = last_pos,
+                        }};
+                        try self.jobs.append(job);
+                    }
+
+                    self.slots[slot.index] = pos;
+                    ip = slot.goto1;
+                },
+                Inst.Match => {
+                    return true;
+                },
+                Inst.Jump => |to| {
+                    ip = to;
+                },
+                Inst.Split => |split| {
+                    const t = Job { .Thread = Thread { .ip = split.goto2, .pos = pos }};
+                    try self.jobs.append(t);
+
+                    ip = split.goto1;
+                }
+            }
+        }
+    }
+
+    // checks if we have visited this specific node and if not, set the bit and return true
+    fn shouldVisit(self: &Self, pc: usize, at: usize) bool {
+        const n = pc * (self.end + 1) + at;
+        const size = 32;
+
+        const bitmask = u32(1) << u5(n & (size - 1));
+
+        if ((self.visited[n/size] & bitmask) != 0) {
+            return false;
+        }
+
+        self.visited[n/size] |= bitmask;
+        return true;
     }
 };

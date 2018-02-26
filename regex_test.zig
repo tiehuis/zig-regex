@@ -2,8 +2,15 @@ const Regex = @import("regex.zig").Regex;
 const debug = @import("std").debug;
 const Parser = @import("parse.zig").Parser;
 
+const FixedBufferAllocator = @import("std").heap.FixedBufferAllocator;
+const mem = @import("std").mem;
+
+// Debug global allocator is too small for our tests
+var buffer: [300000]u8 = undefined;
+var fixed_allocator = FixedBufferAllocator.init(buffer[0..]);
+
 fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
-    var re = Regex.mustCompile(debug.global_allocator, re_input);
+    var re = Regex.mustCompile(&fixed_allocator.allocator, re_input);
 
     if ((re.partialMatch(to_match) catch unreachable) != expected) {
         debug.warn(
@@ -100,10 +107,21 @@ test "regex sanity tests" {
     check("[Hh]ello [Ww]orld\\s*[!]?", "Hello world!   ", true);
     check("[Hh]ello [Ww]orld\\s*[!]?", "Hello world  !", true);
     check("[Hh]ello [Ww]orld\\s*[!]?", "hello World    !", true);
+    // Out of memory due to final capture before match
     check("[^\\w][^-1-4]", ")T", true);
     check("[^\\w][^-1-4]", ")^", true);
     check("[^\\w][^-1-4]", "*)", true);
     check("[^\\w][^-1-4]", "!.", true);
     check("[^\\w][^-1-4]", " x", true);
     check("[^\\w][^-1-4]", "$b", true);
+}
+
+test "regex captures" {
+    var r = Regex.mustCompile(debug.global_allocator, "ab(\\d+)");
+
+    debug.assert(try r.partialMatch("xxxxab0123a"));
+    const caps = try r.captures("xxxxab0123");
+
+    debug.assert(mem.eql(u8, "ab0123", caps.at(0)));
+    debug.assert(mem.eql(u8, "0123", caps.at(1)));
 }
