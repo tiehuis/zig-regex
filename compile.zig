@@ -10,90 +10,67 @@ const ByteClass = parser.ByteClass;
 const Expr = parser.Expr;
 const Assertion = parser.Assertion;
 
-const InstSplit = struct {
-    goto1: usize,
-    goto2: usize,
-};
-
-const InstChar = struct {
-    goto1: usize,
-    c: u8,
-};
-
-const InstByteClass = struct {
-    goto1: usize,
-    class: ByteClass,
-};
-
-const InstJump = struct {
-    goto1: usize,
-};
-
-const InstEmptyMatch = struct {
-    goto1: usize,
-    assertion: Assertion,
-};
-
-const InstCapture = struct {
-    goto1: usize,
-    index: usize,
+pub const InstData = union(enum) {
+    // Match the specified character.
+    Char: u8,
+    // Match the specified character ranges.
+    ByteClass: ByteClass,
+    // Matches the AnyChar special cases
+    AnyCharNotNL,
+    // Empty match (\w assertion)
+    EmptyMatch: Assertion,
+    // Stop the thread, found a match
+    Match,
+    // Jump to the instruction at address x
+    Jump,
+    // Split execution, spawing a new thread and continuing in lockstep
+    Split: usize,
+    // Slot to save position in
+    Save: usize,
 };
 
 // Represents instructions for the VM.
-//
-// TODO: Simplify Inst by having the 'goto1' field being a common 'out' parameter.
-pub const Inst = union(enum) {
-    // Match the specified character.
-    Char: InstChar,
+pub const Inst = struct {
+    // Next instruction to execute
+    out: usize,
+    // Associated data with this
+    data: InstData,
 
-    // Match the specified character ranges.
-    ByteClass: InstByteClass,
-
-    // Matches the AnyChar special cases
-    AnyCharNotNL: InstJump,
-
-    // Empty match (\w assertion)
-    EmptyMatch: InstEmptyMatch,
-
-    // Stop the thread, found a match
-    Match,
-
-    // Jump to the instruction at address x
-    Jump: usize,
-
-    // Split execution, spawing a new thread and continuing in lockstep
-    Split: InstSplit,
-
-    Save: InstCapture,
+    pub fn new(out: usize, data: &const InstData) Inst {
+        return Inst {
+            .out = out,
+            .data = *data,
+        };
+    }
 
     pub fn dump(s: &const Inst) void {
-        switch (*s) {
-            Inst.Char => |x| {
-                debug.warn("char {}, '{c}'\n", x.goto1, x.c);
+        switch (s.data) {
+            InstData.Char => |ch| {
+                debug.warn("char({}) '{c}'\n", s.out, ch);
             },
-            Inst.EmptyMatch => |x| {
-                debug.warn("emptymatch({}) {}\n", @tagName(x.assertion), x.goto1);
+            InstData.EmptyMatch => |assertion| {
+                debug.warn("empty({}) {}\n", s.out, @tagName(assertion));
             },
-            Inst.ByteClass => |x| {
-                debug.warn("range {}, ", x.goto1);
-                for (x.class.ranges.toSliceConst()) |r|
+            InstData.ByteClass => |class| {
+                debug.warn("range({}) ", s.out);
+                for (class.ranges.toSliceConst()) |r|
                     debug.warn("[{}-{}]", r.min, r.max);
                 debug.warn("\n");
             },
-            Inst.AnyCharNotNL => |x| {
-                debug.warn("anychar {}\n", x.goto1);
+            InstData.AnyCharNotNL => {
+                debug.warn("any({})\n", s.out);
             },
-            Inst.Match => {
+            InstData.Match => {
                 debug.warn("match\n");
             },
-            Inst.Jump => |x| {
-                debug.warn("jump {}\n", x);
+            InstData.Jump => {
+                debug.warn("jump({})\n", s.out);
             },
-            Inst.Split => |x| {
-                debug.warn("split {}, {}\n", x.goto1, x.goto2);
+            InstData.Split => |branch| {
+                debug.warn("split({}) {}\n", s.out, branch);
             },
-            Inst.Save => |x| {
-                debug.warn("save {}, {}\n", x.index, x.goto1);
+            InstData.Save => |slot| {
+                debug.warn("save({}), {}\n", s.out, slot);
             },
         }
     }
@@ -117,36 +94,6 @@ const InstHole = union(enum) {
     Split2: usize,
     // Save capture
     Save: usize,
-
-    pub fn dump(s: &const InstHole) void {
-        debug.warn("{}", @tagName(*s));
-        switch (*s) {
-            InstHole.Char => |ch| {
-                debug.warn("('{c}')\n", ch);
-            },
-            InstHole.EmptyMatch => |assertion| {
-                debug.warn("({})\n", @tagName(assertion));
-            },
-            InstHole.ByteClass => |x| {
-                debug.warn("(");
-                for (x.ranges.toSliceConst()) |r|
-                    debug.warn("[{}-{}]", r.min, r.max);
-                debug.warn(")\n");
-            },
-            InstHole.AnyCharNotNL, InstHole.Split => {
-                debug.warn("\n");
-            },
-            InstHole.Split1 => |x| {
-                debug.warn("({})\n", x);
-            },
-            InstHole.Split2 => |x| {
-                debug.warn("({})\n", x);
-            },
-            InstHole.Save => |x| {
-                debug.warn("({})\n", x);
-            },
-        }
-    }
 };
 
 // Represents a partial instruction. During compilation the instructions will be a mix of compiled
@@ -167,36 +114,36 @@ const PartialInst = union(enum) {
                 // Generate the corresponding compiled instruction. All simply goto the specified
                 // instruction, except for the dual split case, in which both outgoing pointers
                 // go to the same place.
-                switch (ih) {
-                    InstHole.Char => |ch| {
-                        comp = Inst { .Char = InstChar { .goto1 = i, .c = ch }};
-                    },
-                    InstHole.EmptyMatch => |assertion| {
-                        comp = Inst { .EmptyMatch = InstEmptyMatch { .goto1 = i, .assertion = assertion }};
-                    },
-                    InstHole.AnyCharNotNL => {
-                        comp = Inst { .AnyCharNotNL = InstJump { .goto1 = i }};
-                    },
-                    InstHole.ByteClass => |class| {
-                        comp = Inst { .ByteClass = InstByteClass { .goto1 = i, .class = class }};
-                    },
-                    InstHole.Split => {
-                        comp = Inst { .Split = InstSplit { .goto1 = i, .goto2 = i }};
-                    },
-                    // 1st was already filled
-                    InstHole.Split1 => |split| {
-                        comp = Inst { .Split = InstSplit { .goto1 = split, .goto2 = i }};
-                    },
-                    // 2nd was already filled
-                    InstHole.Split2 => |split| {
-                        comp = Inst { .Split = InstSplit { .goto1 = i, .goto2 = split }};
-                    },
-                    InstHole.Save => |code| {
-                        comp = Inst { .Save = InstCapture { .goto1 = i, .index = code }};
-                    },
-                }
+                const compiled = switch (ih) {
+                    InstHole.Char => |ch|
+                        Inst.new(i, InstData { .Char = ch }),
 
-                *s = PartialInst { .Compiled = comp };
+                    InstHole.EmptyMatch => |assertion|
+                        Inst.new(i, InstData { .EmptyMatch = assertion }),
+
+                    InstHole.AnyCharNotNL =>
+                        Inst.new(i, InstData.AnyCharNotNL),
+
+                    InstHole.ByteClass => |class|
+                        Inst.new(i, InstData { .ByteClass = class }),
+
+                    InstHole.Split =>
+                        // If we both point to the same output, we can encode as a jump
+                        Inst.new(i, InstData.Jump),
+
+                    // 1st was already filled
+                    InstHole.Split1 => |split|
+                        Inst.new(split, InstData { .Split = i }),
+
+                    // 2nd was already filled
+                    InstHole.Split2 => |split|
+                        Inst.new(i, InstData { .Split = split }),
+
+                    InstHole.Save => |slot|
+                        Inst.new(i, InstData { .Save = slot }),
+                };
+
+                *s = PartialInst { .Compiled = compiled };
             },
             PartialInst.Compiled => {
                 // nothing to do, already filled
@@ -283,7 +230,7 @@ pub const Compiler = struct {
         // surround in a full program match
         const entry = c.insts.len;
         const index = c.nextCaptureIndex();
-        try c.pushCompiled(Inst { .Save = InstCapture { .goto1 = entry + 1, .index = index }});
+        try c.pushCompiled(Inst.new(entry + 1, InstData { .Save = index }));
 
         // compile the main expression
         const patch = try c.compileInternal(expr);
@@ -294,7 +241,7 @@ pub const Compiler = struct {
 
         // fill any holes to end at the next instruction which will be a match
         c.fillToNext(h);
-        try c.insts.append(PartialInst { .Compiled = Inst.Match } );
+        try c.pushCompiled(Inst.new(0, InstData.Match));
 
         var p = ArrayList(Inst).init(c.allocator);
         defer p.deinit();
@@ -304,9 +251,8 @@ pub const Compiler = struct {
                 PartialInst.Compiled => |x| {
                     try p.append(x);
                 },
-                else => {
-                    debug.warn("Uncompiled instruction: ");
-                    e.Uncompiled.dump();
+                else => |inner| {
+                    debug.warn("Uncompiled instruction: {}", @tagName(inner));
                     @panic("uncompiled instruction encountered during compilation");
                 }
             }
@@ -324,8 +270,8 @@ pub const Compiler = struct {
         // 4: any 3
         const fragment_start = c.insts.len;
         const fragment = []Inst {
-            Inst { .Split = InstSplit { .goto1 = 0, .goto2 = fragment_start + 1 }},
-            Inst { .AnyCharNotNL = InstJump { .goto1 = fragment_start }},
+            Inst.new(0, InstData { .Split = fragment_start + 1 }),
+            Inst.new(fragment_start, InstData.AnyCharNotNL),
         };
         try p.appendSlice(fragment);
 
@@ -441,7 +387,7 @@ pub const Compiler = struct {
 
                 const index = c.nextCaptureIndex();
 
-                try c.pushCompiled(Inst { .Save = InstCapture { .goto1 = entry + 1, .index = index }});
+                try c.pushCompiled(Inst.new(entry + 1, InstData { .Save = index }));
                 const p = try c.compileInternal(subexpr);
                 c.fillToNext(p.hole);
 
@@ -538,7 +484,7 @@ pub const Compiler = struct {
         c.fillToNext(p.hole);
 
         // Jump back to the entry split
-        try c.pushCompiled(Inst { .Jump = entry });
+        try c.pushCompiled(Inst.new(entry, InstData.Jump));
 
         // Return a filled patch set to the first split instruction.
         return Patch { .hole = h, .entry = entry };

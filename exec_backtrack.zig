@@ -12,7 +12,7 @@ const Expr = parse.Expr;
 const Assertion = parse.Assertion;
 const Compiler = compile.Compiler;
 const Prog = compile.Prog;
-const Inst = compile.Inst;
+const InstData = compile.InstData;
 const Input = @import("input.zig").Input;
 
 const SaveRestore = struct {
@@ -114,62 +114,59 @@ pub const VmBacktrack = struct {
                 return false;
             }
 
-            switch (self.prog.insts[ip]) {
-                Inst.Char => |ch| {
-                    if (pos >= inp.len or ch.c != inp.at(pos)) {
+            const inst = self.prog.insts[ip];
+
+            switch (inst.data) {
+                InstData.Char => |ch| {
+                    if (pos >= inp.len or ch != inp.at(pos)) {
                         return false;
                     }
-                    ip = ch.goto1;
                     pos += 1;
                 },
-                Inst.EmptyMatch => |em| {
-                    if (pos >= inp.len or !inp.isEmptyMatch(pos, em.assertion)) {
+                InstData.EmptyMatch => |assertion| {
+                    if (pos >= inp.len or !inp.isEmptyMatch(pos, assertion)) {
                         return false;
                     }
-                    ip = em.goto1;
                 },
-                Inst.ByteClass => |inst| {
-                    if (pos >= inp.len or !inst.class.contains(inp.at(pos))) {
+                InstData.ByteClass => |class| {
+                    if (pos >= inp.len or !class.contains(inp.at(pos))) {
                         return false;
                     }
-                    ip = inst.goto1;
                     pos += 1;
                 },
-                Inst.AnyCharNotNL => |c| {
+                InstData.AnyCharNotNL => {
                     if (pos >= inp.len or inp.at(pos) == '\n') {
                         return false;
                     }
-                    ip = c.goto1;
                     pos += 1;
                 },
-                Inst.Save => |slot| {
+                InstData.Save => |slot| {
                     // We can save an existing match by creating a job which will run on this thread
                     // failing. This will reset to the old match before any subsequent splits in
                     // this thread.
-                    if (self.slots[slot.index]) |last_pos| {
+                    if (self.slots[slot]) |last_pos| {
                         const job = Job { .SaveRestore = SaveRestore {
-                            .slot = slot.index,
+                            .slot = slot,
                             .last_pos = last_pos,
                         }};
                         try self.jobs.append(job);
                     }
 
-                    self.slots[slot.index] = pos;
-                    ip = slot.goto1;
+                    self.slots[slot] = pos;
                 },
-                Inst.Match => {
+                InstData.Match => {
                     return true;
                 },
-                Inst.Jump => |to| {
-                    ip = to;
+                InstData.Jump => {
+                    // Jump at end of loop
                 },
-                Inst.Split => |split| {
-                    const t = Job { .Thread = Thread { .ip = split.goto2, .pos = pos }};
+                InstData.Split => |split| {
+                    const t = Job { .Thread = Thread { .ip = split, .pos = pos }};
                     try self.jobs.append(t);
-
-                    ip = split.goto1;
                 }
             }
+
+            ip = inst.out;
         }
     }
 
