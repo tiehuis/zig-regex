@@ -1,4 +1,4 @@
-An automation-based regex implementation for [zig](http://ziglang.org/).
+An automaton-based regex implementation for [zig](http://ziglang.org/).
 
 Note: This is still a work in progress and many things still need to be done.
 

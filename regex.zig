@@ -36,15 +36,13 @@ const Expr = parse.Expr;
 const Compiler = compile.Compiler;
 const Prog = compile.Prog;
 const Inst = compile.Inst;
-const VmBacktrack = exec.VmBacktrack;
 
 pub const Regex = struct {
+    allocator: &Allocator,
     // Manages the prog state (TODO: Just store allocator in Prog)
     compiler: Compiler,
     // A compiled set of instructions
     compiled: Prog,
-    // Which engine we are using, have a literal matcher engine too
-    engine: VmBacktrack,
     // Capture slots (20 max right now)
     slots: [40]?usize,
 
@@ -59,9 +57,9 @@ pub const Regex = struct {
         errdefer c.deinit();
 
         return Regex {
+            .allocator = a,
             .compiler = c,
             .compiled = try c.compile(expr),
-            .engine = VmBacktrack{},
             .slots = []?usize {null} ** 40,
         };
     }
@@ -78,9 +76,9 @@ pub const Regex = struct {
         const prog = c.compile(expr) catch unreachable;
 
         return Regex {
+            .allocator = a,
             .compiler = c,
             .compiled = prog,
-            .engine = VmBacktrack.init(a),
             .slots = []?usize {null} ** 40,
         };
     }
@@ -91,20 +89,20 @@ pub const Regex = struct {
 
     // does the regex match the entire input string? simply run through from the first position.
     pub fn match(re: &Regex, input: []const u8) !bool {
-        return re.engine.exec(re.compiled, re.compiled.start, input, re.slots[0..]);
+        return exec.exec(re.allocator, re.compiled, re.compiled.start, input, re.slots[0..]);
     }
 
     // does the regexp match any region within the string? memchr to the first byte in the regex
     // (if possible) and then run the matcher from there. this is important.
     pub fn partialMatch(re: &Regex, input: []const u8) !bool {
-        return re.engine.exec(re.compiled, re.compiled.find_start, input, re.slots[0..]);
+        return exec.exec(re.allocator, re.compiled, re.compiled.find_start, input, re.slots[0..]);
     }
 
     // where does the string match in the regex?
     //
     // the 0 capture is the entire match.
     pub fn captures(re: &Regex, input: []const u8) !?ArrayList([]const u8) {
-        const r = try re.engine.exec(re.compiled, re.compiled.find_start, input, re.slots[0..]);
+        const r = try exec.exec(re.allocator, re.compiled, re.compiled.find_start, input, re.slots[0..]);
 
         if (!r) {
             return null;
@@ -114,7 +112,6 @@ pub const Regex = struct {
         // both non-null or null.
         var s = ArrayList([]const u8).init(re.compiler.allocator);
         errdefer s.deinit();
-
 
         // TODO: Iterator interface plus ensure all captures are cleared on failure
         var i: usize = 0;
