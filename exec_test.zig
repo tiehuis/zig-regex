@@ -1,21 +1,91 @@
-const Regex = @import("regex.zig").Regex;
+const exec = @import("exec.zig").exec;
 const debug = @import("std").debug;
 const Parser = @import("parse.zig").Parser;
+const Regex = @import("regex.zig").Regex;
 
 const FixedBufferAllocator = @import("std").heap.FixedBufferAllocator;
 const mem = @import("std").mem;
 
+// vms to test
+const BacktrackVm = @import("exec_backtrack.zig").BacktrackVm;
+const PikeVm = @import("exec_pikevm.zig").PikeVm;
+
 // Debug global allocator is too small for our tests
-var buffer: [300000]u8 = undefined;
+var buffer: [800000]u8 = undefined;
 var fixed_allocator = FixedBufferAllocator.init(buffer[0..]);
 
 fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
     var re = Regex.mustCompile(&fixed_allocator.allocator, re_input);
 
-    if ((re.partialMatch(to_match) catch unreachable) != expected) {
+    // This is just an engine comparison test but we should also test against fixed vectors
+    var backtrack = BacktrackVm.init(re.allocator);
+    var backtrack_slots = []?usize {null} ** 40;
+    var pike = PikeVm.init(re.allocator);
+    var pike_slots = []?usize {null} ** 40;
+
+    const pike_result = pike.exec(re.compiled, re.compiled.find_start, re_input, pike_slots[0..]) catch unreachable;
+    const backtrack_result = backtrack.exec(re.compiled, re.compiled.find_start, re_input, backtrack_slots[0..]) catch unreachable;
+
+    // NOTE: equality on nullables? this is really bad
+    var slots_equal = true;
+    for (backtrack_slots) |_, i| {
+        if (backtrack_slots[i]) |ok1| {
+            if (pike_slots[i]) |ok2| {
+                if (ok1 != ok2) {
+                    continue;
+                }
+            }
+        } else {
+            if (pike_slots[i]) |_x| {
+            } else {
+                continue;
+            }
+        }
+
+        slots_equal = false;
+        break;
+    }
+
+    if (pike_result != backtrack_result) { // or !slots_equal) {
         debug.warn(
             \\
-            \\ -- Failure! ------------------
+            \\ -- Failure! ----------------
+            \\
+            \\
+            \\pikevm:    {}
+            \\backtrack: {}
+            \\
+            ,
+            pike_result,
+            backtrack_result
+        );
+
+        debug.warn(
+            \\
+            \\ -- Slots -------------------
+            \\
+            \\pikevm
+            \\
+        );
+        for (pike_slots) |entry| {
+            debug.warn("{} ", entry);
+        }
+        debug.warn("\n");
+
+        debug.warn(
+            \\
+            \\
+            \\backtrack
+            \\
+        );
+        for (backtrack_slots) |entry| {
+            debug.warn("{} ", entry);
+        }
+        debug.warn("\n");
+
+        debug.warn(
+            \\
+            \\ -- Regex ------------------
             \\
             \\Regex:    '{}'
             \\String:   '{}'
@@ -56,7 +126,7 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
     }
 }
 
-test "regex sanity tests" {
+test "pikevm == backtrackvm" {
     // Taken from tiny-regex-c
 
     check("\\d", "5", true);
@@ -113,14 +183,4 @@ test "regex sanity tests" {
     check("[^\\w][^-1-4]", "!.", true);
     check("[^\\w][^-1-4]", " x", true);
     check("[^\\w][^-1-4]", "$b", true);
-}
-
-test "regex captures" {
-    var r = Regex.mustCompile(debug.global_allocator, "ab(\\d+)");
-
-    debug.assert(try r.partialMatch("xxxxab0123a"));
-    const caps = if (try r.captures("xxxxab0123a")) |caps| caps else unreachable;
-
-    debug.assert(mem.eql(u8, "ab0123", caps.at(0)));
-    debug.assert(mem.eql(u8, "0123", caps.at(1)));
 }

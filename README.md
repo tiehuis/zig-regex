@@ -5,7 +5,7 @@ Note: This is still a work in progress and many things still need to be done.
  - [x] Capture group support
  - [ ] UTF-8 support
  - [ ] More tests (plus some automated tests/fuzzing)
- - [ ] Add a PikeVM implementation
+ - [x] Add a PikeVM implementation
  - [ ] Literal optimizations and just general performance improvements.
 
 ## Usage

@@ -36,7 +36,7 @@ const Job = union(enum) {
 
 // This is bounded and only used for small compiled regexes. It is not quadratic since pre-seen
 // nodes are cached across threads.
-pub const VmBacktrack = struct {
+pub const BacktrackVm = struct {
     const Self = this;
 
     // pending jobs
