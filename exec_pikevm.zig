@@ -17,11 +17,11 @@ const Parser = parse.Parser;
 const Assertion = parse.Assertion;
 const Prog = compile.Prog;
 const InstData = compile.InstData;
-const Input = @import("input.zig").Input;
+const InputBytes = @import("input.zig").InputBytes;
 
 const Thread = struct {
     pc: usize,
-    slots: [40]?usize,
+    slots: &ArrayList(?usize),
 };
 
 pub const PikeVm = struct {
@@ -35,58 +35,58 @@ pub const PikeVm = struct {
         };
     }
 
-    pub fn exec(self: &Self, prog: &const Prog, prog_start: usize, input: []const u8, slots: []?usize) !bool {
+    pub fn exec(self: &Self, prog: &const Prog, prog_start: usize, re_input: []const u8, slots: &ArrayList(?usize)) !bool {
         var clist = ArrayList(Thread).init(self.allocator);
         defer clist.deinit();
 
         var nlist = ArrayList(Thread).init(self.allocator);
         defer nlist.deinit();
 
-        const t = Thread { .pc = prog_start, .slots = []?usize {null} ** 40 };
+        // We can share a single array-list across all threads as we only move forward.
+        slots.shrink(0);
+
+        const t = Thread { .pc = prog_start, .slots = slots };
         try clist.append(t);
 
-        // TODO: Actually iterate using the Input class since we will need this for utf-8.
-        var inp = Input.init(input);
+        var input = InputBytes.init(re_input);
 
-        // TODO: we need to iterate once past the last match, can we avoid doing this everywhere?
-        var pos: usize = 0;
-        while (pos < inp.len + 1) : (pos += 1) {
+        while (!input.isConsumed()) : (input.advance()) {
             while (clist.popOrNull()) |thread| {
                 const inst = prog.insts[thread.pc];
 
                 switch (inst.data) {
                     InstData.Char => |ch| {
-                        if (pos < inp.len and inp.at(pos) == ch) {
+                        if (input.current() == ch) {
                             try nlist.append(Thread { .pc = inst.out, .slots = thread.slots });
                         }
                     },
                     InstData.EmptyMatch => |assertion| {
-                        if (pos < inp.len and inp.isEmptyMatch(pos, assertion)) {
+                        if (input.isEmptyMatch(assertion)) {
                             try clist.append(Thread { .pc = inst.out, .slots = thread.slots });
                         }
                     },
                     InstData.ByteClass => |class| {
-                        if (pos < inp.len and class.contains(inp.at(pos))) {
+                        if (class.contains(input.current())) {
                             try nlist.append(Thread { .pc = inst.out, .slots = thread.slots });
                         }
                     },
                     InstData.AnyCharNotNL => {
-                        if (pos < inp.len and inp.at(pos) != '\n') {
+                        if (input.current() != '\n') {
                             try nlist.append(Thread { .pc = inst.out, .slots = thread.slots });
                         }
                     },
                     InstData.Match => {
-                        for (thread.slots) |_, i| {
-                            // TODO: input slots should be a arraylist instead and extended to required length
-                            slots[i] = thread.slots[i];
-                            return true;
-                        }
+                        slots.shrink(0);
+                        try slots.appendSlice(thread.slots.toSliceConst());
+                        return true;
                     },
                     InstData.Save => |slot| {
                         // We don't need a deep copy here since we only ever advance forward so
                         // all future captures are valid for any subsequent threads.
                         var new_thread = Thread { .pc = inst.out, .slots = thread.slots };
-                        new_thread.slots[slot] = pos;
+
+                        try new_thread.slots.ensureCapacity(slot);
+                        new_thread.slots.toSlice()[slot] = input.byte_pos;
 
                         try clist.append(new_thread);
                     },

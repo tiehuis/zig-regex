@@ -13,7 +13,7 @@ const Assertion = parse.Assertion;
 const Compiler = compile.Compiler;
 const Prog = compile.Prog;
 const InstData = compile.InstData;
-const Input = @import("input.zig").Input;
+const InputBytes = @import("input.zig").InputBytes;
 
 const SaveRestore = struct {
     // slot position to restore
@@ -25,8 +25,8 @@ const SaveRestore = struct {
 const Thread = struct {
     // instruction pointer
     ip: usize,
-    // position in input string
-    pos: usize,
+    // Current input position
+    input: InputBytes,
 };
 
 const Job = union(enum) {
@@ -34,32 +34,28 @@ const Job = union(enum) {
     SaveRestore: SaveRestore,
 };
 
-// This is bounded and only used for small compiled regexes. It is not quadratic since pre-seen
-// nodes are cached across threads.
-pub const BacktrackVm = struct {
-    const Self = this;
-
+const ExecState = struct {
     // pending jobs
     jobs: ArrayList(Job),
 
     // cache (we can bound this visited bitset since we bound when we use the backtracking engine.
     visited: [512]u32,
-    // end is the last index of the input and sets our strides for the bitset
-    end: usize,
 
-    // cached entries across invocation
     prog: &const Prog,
-    input: []const u8,
-    slots: []?usize,
+
+    slots: &ArrayList(?usize),
+};
+
+// This is bounded and only used for small compiled regexes. It is not quadratic since pre-seen
+// nodes are cached across threads.
+pub const BacktrackVm = struct {
+    const Self = this;
+
+    allocator: &Allocator,
 
     pub fn init(allocator: &Allocator) Self {
         return Self {
-            .jobs = ArrayList(Job).init(allocator),
-            .visited = undefined,
-            .end = undefined,
-            .prog = undefined,
-            .input = undefined,
-            .slots = undefined,
+            .allocator = allocator,
         };
     }
 
@@ -67,32 +63,33 @@ pub const BacktrackVm = struct {
         return (prog.insts.len + 1) * (input.len + 1) < 512 * 32;
     }
 
-    pub fn exec(self: &Self, prog: &const Prog, prog_start: usize, input: []const u8, slots: []?usize) !bool {
-        // we enforce this by never choosing this engine in the case we exceed this requirement
+    pub fn exec(self: &Self, prog: &const Prog, prog_start: usize, input: []const u8, slots: &ArrayList(?usize)) !bool {
+        // Should never run this without first checking shouldExec and running only if true.
         debug.assert(shouldExec(prog, input));
 
-        self.end = input.len;
-        self.prog = prog;
-        self.input = input;
-        // saved capture locations
-        self.slots = slots;
+        var jobs = ArrayList(Job).init(self.allocator);
+        defer jobs.deinit();
 
-        // reset the visited bitset
-        mem.set(u32, self.visited[0..], 0);
+        var state = ExecState {
+            .jobs = jobs,
+            .visited = []u32{0} ** 512,
+            .prog = prog,
+            .slots = slots,
+        };
 
-        const t = Job { .Thread = Thread { .ip = prog_start, .pos = 0 }};
-        try self.jobs.append(t);
+        const t = Job { .Thread = Thread { .ip = prog_start, .input = InputBytes.init(input) }};
+        try state.jobs.append(t);
 
-        while (self.jobs.popOrNull()) |job| {
+        while (state.jobs.popOrNull()) |job| {
             switch (job) {
                 Job.Thread => |thread| {
-                    if (try self.step(thread.ip, thread.pos)) {
+                    if (try step(&state, &thread)) {
                         return true;
                     }
                 },
                 Job.SaveRestore => |save| {
-                    if (save.slot < self.slots.len) {
-                        self.slots[save.slot] = save.last_pos;
+                    if (save.slot < state.slots.len) {
+                        state.slots.toSlice()[save.slot] = save.last_pos;
                     }
                 },
             }
@@ -101,58 +98,64 @@ pub const BacktrackVm = struct {
         return false;
     }
 
-    // step through the current active thread at the specific position
-    fn step(self: &Self, ip_: usize, pos_: usize) !bool {
-        // We don't need to create threads for linear actions (i.e. match) and can get by with
-        // just modifying the pc. We only need to create threads on the actual splits.
-        var ip = ip_;
-        var pos = pos_;
-        var inp = Input.init(self.input);
+    fn step(state: &ExecState, thread: &const Thread) !bool {
+        // For linear actions, we can just modify the current thread and avoid pushing new items
+        // to the stack.
+        var input = thread.input;
+
+        var ip = thread.ip;
 
         while (true) {
-            if (!self.shouldVisit(ip, pos)) {
+            if (!shouldVisit(state, ip, input.byte_pos)) {
                 return false;
             }
 
-            const inst = self.prog.insts[ip];
+            const inst = state.prog.insts[ip];
 
             switch (inst.data) {
                 InstData.Char => |ch| {
-                    if (pos >= inp.len or ch != inp.at(pos)) {
+                    if (input.isAtEnd() or input.current() != ch) {
                         return false;
                     }
-                    pos += 1;
+                    input.advance();
                 },
                 InstData.EmptyMatch => |assertion| {
-                    if (pos >= inp.len or !inp.isEmptyMatch(pos, assertion)) {
+                    if (input.isAtEnd() or !input.isEmptyMatch(assertion)) {
                         return false;
                     }
                 },
                 InstData.ByteClass => |class| {
-                    if (pos >= inp.len or !class.contains(inp.at(pos))) {
+                    if (input.isAtEnd() or !class.contains(input.current())) {
                         return false;
                     }
-                    pos += 1;
+                    input.advance();
                 },
                 InstData.AnyCharNotNL => {
-                    if (pos >= inp.len or inp.at(pos) == '\n') {
+                    if (input.isAtEnd() and input.current() == '\n') {
                         return false;
                     }
-                    pos += 1;
+                    input.advance();
                 },
                 InstData.Save => |slot| {
+                    // We may not have extended the slot entry.
+                    if (slot >= state.slots.len) {
+                        try state.slots.ensureCapacity(slot + 1);
+                        mem.set(?usize, state.slots.items[state.slots.len..], null);
+                        state.slots.len = slot + 1;
+                    }
+
                     // We can save an existing match by creating a job which will run on this thread
                     // failing. This will reset to the old match before any subsequent splits in
                     // this thread.
-                    if (self.slots[slot]) |last_pos| {
+                    if (state.slots.at(slot)) |last_pos| {
                         const job = Job { .SaveRestore = SaveRestore {
                             .slot = slot,
                             .last_pos = last_pos,
                         }};
-                        try self.jobs.append(job);
+                        try state.jobs.append(job);
                     }
 
-                    self.slots[slot] = pos;
+                    state.slots.toSlice()[slot] = input.byte_pos;
                 },
                 InstData.Match => {
                     return true;
@@ -161,8 +164,8 @@ pub const BacktrackVm = struct {
                     // Jump at end of loop
                 },
                 InstData.Split => |split| {
-                    const t = Job { .Thread = Thread { .ip = split, .pos = pos }};
-                    try self.jobs.append(t);
+                    const t = Job { .Thread = Thread { .ip = split, .input = thread.input }};
+                    try state.jobs.append(t);
                 }
             }
 
@@ -171,17 +174,17 @@ pub const BacktrackVm = struct {
     }
 
     // checks if we have visited this specific node and if not, set the bit and return true
-    fn shouldVisit(self: &Self, pc: usize, at: usize) bool {
-        const n = pc * (self.end + 1) + at;
+    fn shouldVisit(state: &ExecState, ip: usize, at: usize) bool {
+        const n = ip * (state.prog.insts.len + 1) + at;
         const size = 32;
 
         const bitmask = u32(1) << u5(n & (size - 1));
 
-        if ((self.visited[n/size] & bitmask) != 0) {
+        if ((state.visited[n/size] & bitmask) != 0) {
             return false;
         }
 
-        self.visited[n/size] |= bitmask;
+        state.visited[n/size] |= bitmask;
         return true;
     }
 };

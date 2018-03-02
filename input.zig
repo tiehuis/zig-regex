@@ -1,18 +1,42 @@
 const Assertion = @import("parse.zig").Assertion;
 
-pub const Input = struct {
-    slice: []const u8,
-    len: usize,
+pub const InputBytes = struct {
+    const Self = this;
 
-    pub fn init(slice: []const u8) Input {
-        return Input {
-            .slice = slice,
-            .len = slice.len,
+    bytes: []const u8,
+    byte_pos: usize,
+
+    pub fn init(bytes: []const u8) Self {
+        return Self {
+            .bytes = bytes,
+            .byte_pos= 0,
         };
     }
 
-    pub fn at(i: &const Input, n: usize) u8 {
-        return i.slice[n];
+    pub fn current(self: &InputBytes) u8 {
+        if (self.byte_pos < self.bytes.len) {
+            return self.bytes[self.byte_pos];
+        } else {
+            return 0;
+        }
+    }
+
+    pub fn advance(self: &InputBytes) void {
+        self.byte_pos += 1;
+    }
+
+    // Note: We extend the range here to one past the end of the input. This is done in order to
+    // handle complete matches correctly.
+    //
+    // Check any length required conditions (those which check current()) against isAtEnd() first).
+    pub fn isConsumed(self: &const InputBytes) bool {
+        return self.byte_pos > self.bytes.len;
+    }
+
+    // We use this function instead of `isConsumed` when we actually need to access the value such
+    // as during a character check.
+    pub fn isAtEnd(self: &const InputBytes) bool {
+        return self.byte_pos >= self.bytes.len;
     }
 
     fn isWordChar(c: u8) bool {
@@ -22,33 +46,37 @@ pub const Input = struct {
         };
     }
 
-    pub fn isEmptyMatch(i: &const Input, n: usize, match: &const Assertion) bool {
+    fn isNextWordChar(self: &const Self) bool {
+        return (self.byte_pos == 0) or isWordChar(self.bytes[self.byte_pos - 1]);
+    }
+
+    fn isPrevWordChar(self: &const Self) bool {
+        return (self.byte_pos >= self.bytes.len - 1) or isWordChar(self.bytes[self.byte_pos + 1]);
+    }
+
+    pub fn isEmptyMatch(self: &const Self, match: &const Assertion) bool {
         switch (*match) {
             Assertion.None => {
                 return true;
             },
             Assertion.BeginLine => {
-                return n == 0;
+                return self.byte_pos == 0;
             },
             Assertion.EndLine => {
-                return n == i.len - 1;
+                return self.byte_pos >= self.bytes.len - 1;
             },
             Assertion.BeginText => {
                 // TODO: Handle different modes.
-                return n == 0;
+                return self.byte_pos == 0;
             },
             Assertion.EndText => {
-                return n == i.len - 1;
+                return self.byte_pos >= self.bytes.len - 1;
             },
             Assertion.WordBoundaryAscii => {
-                const last = (n == 0) or isWordChar(i.slice[n-1]);
-                const next = (n == i.len - 1) or isWordChar(i.slice[n+1]);
-                return last != next;
+                return self.isPrevWordChar() != self.isNextWordChar();
             },
             Assertion.NotWordBoundaryAscii => {
-                const last = (n == 0) or isWordChar(i.slice[n-1]);
-                const next = (n == i.len - 1) or isWordChar(i.slice[n+1]);
-                return last == next;
+                return self.isPrevWordChar() == self.isNextWordChar();
             },
         }
     }
