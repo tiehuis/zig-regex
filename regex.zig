@@ -43,8 +43,10 @@ pub const Regex = struct {
     compiler: Compiler,
     // A compiled set of instructions
     compiled: Prog,
-    // Capture slots (20 max right now)
+    // Capture slots
     slots: ArrayList(?usize),
+    // Original regex string
+    string: []const u8,
 
     pub fn compile(a: &Allocator, re: []const u8) !Regex {
         var p = Parser.init(a);
@@ -61,6 +63,7 @@ pub const Regex = struct {
             .compiler = c,
             .compiled = try c.compile(expr),
             .slots = ArrayList(?usize).init(a),
+            .string = re,
         };
     }
 
@@ -80,6 +83,7 @@ pub const Regex = struct {
             .compiler = c,
             .compiled = prog,
             .slots = ArrayList(?usize).init(a),
+            .string = re,
         };
     }
 
@@ -101,27 +105,71 @@ pub const Regex = struct {
     // where does the string match in the regex?
     //
     // the 0 capture is the entire match.
-    pub fn captures(re: &Regex, input: []const u8) !?ArrayList([]const u8) {
+    pub fn captures(re: &Regex, input: []const u8) !?Captures {
         const is_match = try exec.exec(re.allocator, re.compiled, re.compiled.find_start, input, &re.slots);
 
-        if (!is_match) {
+        if (is_match) {
+            return Captures.init(input, &re.slots);
+        } else {
             return null;
         }
+    }
+};
 
-        // Transform the raw slot indices into slice matches. Every [2*k, 2*k+1] set should either be
-        // both non-null or null.
-        var matches = ArrayList([]const u8).init(re.allocator);
-        errdefer matches.deinit();
+pub const Span = struct {
+    lower: usize,
+    upper: usize,
+};
 
-        var i: usize = 0;
-        while (i < re.slots.len) : (i += 2) {
-            if (re.slots.at(i)) |start_index| {
-                debug.assert(re.slots.at(i+1) != null);
-                const end_index = ??re.slots.at(i+1);
-                try matches.append(input[start_index..end_index]);
+// A set of captures of a Regex on an input slice.
+pub const Captures = struct {
+    const Self = this;
+
+    input: []const u8,
+    allocator: &Allocator,
+    slots: []const ?usize,
+
+    // Move the slots out of the array list into this capture group.
+    pub fn init(input: []const u8, slots: &ArrayList(?usize)) Captures {
+        return Captures {
+            .input = input,
+            .allocator = slots.allocator,
+            .slots = slots.toOwnedSlice(),
+        };
+    }
+
+    pub fn deinit(self: &Self) void {
+        self.allocator.free(self.slots);
+    }
+
+    pub fn len(self: &const Self) void {
+        return self.slots.len / 2;
+    }
+
+    // Return the slice of the matching string for the specified capture index.
+    // If the index did not participate in the capture group null is returned.
+    pub fn sliceAt(self: &const Self, n: usize) ?[]const u8 {
+        if (self.boundsAt(n)) |span| {
+            return self.input[span.lower..span.upper];
+        }
+
+        return null;
+    }
+
+    // Return the substring slices of the input directly.
+    pub fn boundsAt(self: &const Self, n: usize) ?Span {
+        const base = 2 * n;
+
+        if (base < self.slots.len) {
+            if (self.slots[base]) |lower| {
+                const upper = ??self.slots[base+1];
+                return Span {
+                    .lower = lower,
+                    .upper = upper,
+                };
             }
         }
 
-        return matches;
+        return null;
     }
 };

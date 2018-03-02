@@ -119,8 +119,9 @@ test "regex captures" {
     var r = Regex.mustCompile(debug.global_allocator, "ab(\\d+)");
 
     //debug.assert(try r.partialMatch("xxxxab0123a"));
+
     //const caps = if (try r.captures("xxxxab0123a")) |caps| caps else unreachable;
 
-    //debug.assert(mem.eql(u8, "ab0123", caps.at(0)));
-    //debug.assert(mem.eql(u8, "0123", caps.at(1)));
+    //debug.assert(mem.eql(u8, "ab0123", ??caps.sliceAt(0)));
+    //debug.assert(mem.eql(u8, "0123", ??caps.sliceAt(1)));
 }
