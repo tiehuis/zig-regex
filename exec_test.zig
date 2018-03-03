@@ -52,6 +52,7 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
         }
     }
 
+    // TODO: pikevm captures are broken
     if (pike_result != backtrack_result) { // or !slots_equal) {
         debug.warn(
             \\
