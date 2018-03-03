@@ -137,11 +137,11 @@ pub const BacktrackVm = struct {
                     input.advance();
                 },
                 InstData.Save => |slot| {
-                    // We may not have extended the slot entry.
-                    if (slot >= state.slots.len) {
-                        try state.slots.ensureCapacity(slot + 1);
-                        mem.set(?usize, state.slots.items[state.slots.len..], null);
-                        state.slots.len = slot + 1;
+                    // Our capture array may not be long enough, extend and fill with empty
+                    while (state.slots.len <= slot) {
+                        // TODO: Can't append null as optional
+                        try state.slots.append(0);
+                        state.slots.toSlice()[state.slots.len-1] = null;
                     }
 
                     // We can save an existing match by creating a job which will run on this thread

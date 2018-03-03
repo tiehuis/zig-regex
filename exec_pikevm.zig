@@ -35,7 +35,7 @@ pub const PikeVm = struct {
         };
     }
 
-    pub fn exec(self: &Self, prog: &const Prog, prog_start: usize, re_input: []const u8, slots: &ArrayList(?usize)) !bool {
+    pub fn exec(self: &Self, prog: &const Prog, prog_start: usize, str_input: []const u8, slots: &ArrayList(?usize)) !bool {
         var clist = ArrayList(Thread).init(self.allocator);
         defer clist.deinit();
 
@@ -48,7 +48,7 @@ pub const PikeVm = struct {
         const t = Thread { .pc = prog_start, .slots = slots };
         try clist.append(t);
 
-        var input = InputBytes.init(re_input);
+        var input = InputBytes.init(str_input);
 
         while (!input.isConsumed()) : (input.advance()) {
             while (clist.popOrNull()) |thread| {
@@ -56,26 +56,27 @@ pub const PikeVm = struct {
 
                 switch (inst.data) {
                     InstData.Char => |ch| {
-                        if (input.current() == ch) {
+                        if (!input.isAtEnd() and input.current() == ch) {
                             try nlist.append(Thread { .pc = inst.out, .slots = thread.slots });
                         }
                     },
                     InstData.EmptyMatch => |assertion| {
-                        if (input.isEmptyMatch(assertion)) {
+                        if (!input.isAtEnd() and input.isEmptyMatch(assertion)) {
                             try clist.append(Thread { .pc = inst.out, .slots = thread.slots });
                         }
                     },
                     InstData.ByteClass => |class| {
-                        if (class.contains(input.current())) {
+                        if (!input.isAtEnd() and class.contains(input.current())) {
                             try nlist.append(Thread { .pc = inst.out, .slots = thread.slots });
                         }
                     },
                     InstData.AnyCharNotNL => {
-                        if (input.current() != '\n') {
+                        if (!input.isAtEnd() and input.current() != '\n') {
                             try nlist.append(Thread { .pc = inst.out, .slots = thread.slots });
                         }
                     },
                     InstData.Match => {
+                        // Note: May need to shrink array here.
                         slots.shrink(0);
                         try slots.appendSlice(thread.slots.toSliceConst());
                         return true;
@@ -85,9 +86,14 @@ pub const PikeVm = struct {
                         // all future captures are valid for any subsequent threads.
                         var new_thread = Thread { .pc = inst.out, .slots = thread.slots };
 
-                        try new_thread.slots.ensureCapacity(slot);
-                        new_thread.slots.toSlice()[slot] = input.byte_pos;
+                        // Our capture array may not be long enough, extend and fill with empty
+                        while (new_thread.slots.len <= slot) {
+                            // TODO: Can't append null as optional
+                            try new_thread.slots.append(0);
+                            new_thread.slots.toSlice()[new_thread.slots.len-1] = null;
+                        }
 
+                        new_thread.slots.toSlice()[slot] = input.byte_pos;
                         try clist.append(new_thread);
                     },
                     InstData.Jump => {
