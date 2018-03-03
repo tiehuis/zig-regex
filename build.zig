@@ -11,12 +11,15 @@ pub fn build(b: &Builder) void {
         "regex_test.zig",
     };
 
-    for (test_files) |test_file| {
-        const this_test = b.addTest(test_file);
+    inline for (test_files) |test_file| {
+        const this_test = b.addTest("src/" ++ test_file);
         test_step.dependOn(&this_test.step);
     }
 
-    const build_lib_step = b.addStaticLibrary("regex", "regex.zig");
+    const build_lib_step = b.step("library", "Build static library");
+
+    const build_lib = b.addStaticLibrary("regex", "src/regex.zig");
+    build_lib_step.dependOn(&build_lib.step);
 
     b.default_step.dependOn(test_step);
 }
