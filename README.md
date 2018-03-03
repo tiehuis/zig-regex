@@ -23,6 +23,8 @@ test "example" {
 
 ## Api
 
+### Regex
+
 ```
 fn compile(a: &Allocator, re: []const u8) !Regex
 ```
@@ -58,13 +60,35 @@ leftmost and does not have to be anchored to the start of `input`.
 ---
 
 ```
-pub fn captures(re: &const Regex, input: []const u8) !?ArrayList([]const u8)
+pub fn captures(re: &const Regex, input: []const u8) !?Captures
 ```
 
 Match a compiled regex against some input. Returns a list of all matching
 slices in the regex with the first (0-index) being the entire regex.
 
 If no match was found, null is returned.
+
+### Captures
+
+```
+pub fn sliceAt(captures: &const Captures, n: usize) ?[]const u8
+```
+
+Return the sub-slice for the numbered capture group. 0 refers to the entire
+match.
+
+```
+pub fn boundsAt(captures: &const Captures, n: usize) ?Span
+```
+
+Return the lower and upper byte positions for the specified capture group.
+
+We can retrieve the sub-slice using this function:
+
+```
+const span = caps.boundsAt(0)
+debug.assert(mem.eql(u8, caps.sliceAt(0), input[span.lower..span.upper]));
+```
 
 ---
 
