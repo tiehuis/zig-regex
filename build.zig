@@ -6,7 +6,6 @@ pub fn build(b: &Builder) void {
     const test_step = b.step("test", "Run all tests");
 
     const test_files = [][]const u8 {
-        "range_set.zig",
         "parse_test.zig",
         "exec_test.zig",
         "regex_test.zig",

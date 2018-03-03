@@ -53,25 +53,26 @@ pub const PikeVm = struct {
         while (!input.isConsumed()) : (input.advance()) {
             while (clist.popOrNull()) |thread| {
                 const inst = prog.insts[thread.pc];
+                const at = input.current();
 
                 switch (inst.data) {
                     InstData.Char => |ch| {
-                        if (!input.isAtEnd() and input.current() == ch) {
+                        if (at != null and ??at == ch) {
                             try nlist.append(Thread { .pc = inst.out, .slots = thread.slots });
                         }
                     },
                     InstData.EmptyMatch => |assertion| {
-                        if (!input.isAtEnd() and input.isEmptyMatch(assertion)) {
+                        if (input.isEmptyMatch(assertion)) {
                             try clist.append(Thread { .pc = inst.out, .slots = thread.slots });
                         }
                     },
                     InstData.ByteClass => |class| {
-                        if (!input.isAtEnd() and class.contains(input.current())) {
+                        if (at != null and class.contains(??at)) {
                             try nlist.append(Thread { .pc = inst.out, .slots = thread.slots });
                         }
                     },
                     InstData.AnyCharNotNL => {
-                        if (!input.isAtEnd() and input.current() != '\n') {
+                        if (at != null and ??at != '\n') {
                             try nlist.append(Thread { .pc = inst.out, .slots = thread.slots });
                         }
                     },

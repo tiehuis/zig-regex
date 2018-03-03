@@ -106,32 +106,33 @@ pub const BacktrackVm = struct {
         var ip = thread.ip;
 
         while (true) {
+            const inst = state.prog.insts[ip];
+            const at = input.current();
+
             if (!shouldVisit(state, ip, input.byte_pos)) {
                 return false;
             }
 
-            const inst = state.prog.insts[ip];
-
             switch (inst.data) {
                 InstData.Char => |ch| {
-                    if (input.isAtEnd() or input.current() != ch) {
+                    if (at == null or ??at != ch) {
                         return false;
                     }
                     input.advance();
                 },
                 InstData.EmptyMatch => |assertion| {
-                    if (input.isAtEnd() or !input.isEmptyMatch(assertion)) {
+                    if (!input.isEmptyMatch(assertion)) {
                         return false;
                     }
                 },
                 InstData.ByteClass => |class| {
-                    if (input.isAtEnd() or !class.contains(input.current())) {
+                    if (at == null or !class.contains(??at)) {
                         return false;
                     }
                     input.advance();
                 },
                 InstData.AnyCharNotNL => {
-                    if (input.isAtEnd() and input.current() == '\n') {
+                    if (at == null or ??at == '\n') {
                         return false;
                     }
                     input.advance();
@@ -164,7 +165,7 @@ pub const BacktrackVm = struct {
                     // Jump at end of loop
                 },
                 InstData.Split => |split| {
-                    const t = Job { .Thread = Thread { .ip = split, .input = thread.input }};
+                    const t = Job { .Thread = Thread { .ip = split, .input = input }};
                     try state.jobs.append(t);
                 }
             }
@@ -175,10 +176,12 @@ pub const BacktrackVm = struct {
 
     // checks if we have visited this specific node and if not, set the bit and return true
     fn shouldVisit(state: &ExecState, ip: usize, at: usize) bool {
-        const n = ip * (state.prog.insts.len + 1) + at;
-        const size = 32;
+        const BitsetType = @typeOf(state.visited).Child;
+        const BitsetShiftType = std.math.Log2Int(BitsetType);
 
-        const bitmask = u32(1) << u5(n & (size - 1));
+        const size = @sizeOf(BitsetType);
+        const n = ip * (state.prog.insts.len + 1) + at;
+        const bitmask = BitsetType(1) << BitsetShiftType(n & (size - 1));
 
         if ((state.visited[n/size] & bitmask) != 0) {
             return false;

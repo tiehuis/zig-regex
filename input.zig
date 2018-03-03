@@ -9,34 +9,29 @@ pub const InputBytes = struct {
     pub fn init(bytes: []const u8) Self {
         return Self {
             .bytes = bytes,
-            .byte_pos= 0,
+            .byte_pos = 0,
         };
     }
 
-    pub fn current(self: &InputBytes) u8 {
+    // TODO: When we can compare ?usize == usize this will be a bit nicer.
+    pub fn current(self: &InputBytes) ?u8 {
         if (self.byte_pos < self.bytes.len) {
             return self.bytes[self.byte_pos];
         } else {
-            return 0;
+            return null;
         }
     }
 
     pub fn advance(self: &InputBytes) void {
-        self.byte_pos += 1;
+        if (self.byte_pos <= self.bytes.len) {
+            self.byte_pos += 1;
+        }
     }
 
     // Note: We extend the range here to one past the end of the input. This is done in order to
     // handle complete matches correctly.
-    //
-    // Check any length required conditions (those which check current()) against isAtEnd() first).
     pub fn isConsumed(self: &const InputBytes) bool {
         return self.byte_pos > self.bytes.len;
-    }
-
-    // We use this function instead of `isConsumed` when we actually need to access the value such
-    // as during a character check.
-    pub fn isAtEnd(self: &const InputBytes) bool {
-        return self.byte_pos >= self.bytes.len;
     }
 
     fn isWordChar(c: u8) bool {
