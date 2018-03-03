@@ -13,7 +13,7 @@ const Assertion = parse.Assertion;
 const Compiler = compile.Compiler;
 const Prog = compile.Prog;
 const InstData = compile.InstData;
-const InputBytes = @import("input.zig").InputBytes;
+const Input = @import("input.zig").Input;
 
 const SaveRestore = struct {
     // slot position to restore
@@ -26,7 +26,7 @@ const Thread = struct {
     // instruction pointer
     ip: usize,
     // Current input position
-    input: InputBytes,
+    input: Input,
 };
 
 const Job = union(enum) {
@@ -35,11 +35,14 @@ const Job = union(enum) {
 };
 
 const ExecState = struct {
+    const BitsetLen = 512;
+    const BitsetType = u32;
+
     // pending jobs
     jobs: ArrayList(Job),
 
     // cache (we can bound this visited bitset since we bound when we use the backtracking engine.
-    visited: [512]u32,
+    visited: [BitsetLen]BitsetType,
 
     prog: &const Prog,
 
@@ -50,7 +53,6 @@ const ExecState = struct {
 // nodes are cached across threads.
 pub const BacktrackVm = struct {
     const Self = this;
-
     allocator: &Allocator,
 
     pub fn init(allocator: &Allocator) Self {
@@ -59,11 +61,11 @@ pub const BacktrackVm = struct {
         };
     }
 
-    fn shouldExec(prog: &const Prog, input: []const u8) bool {
-        return (prog.insts.len + 1) * (input.len + 1) < 512 * 32;
+    fn shouldExec(prog: &const Prog, input: &const Input) bool {
+        return (prog.insts.len + 1) * (input.bytes.len + 1) < ExecState.BitsetLen * @sizeOf(ExecState.BitsetType);
     }
 
-    pub fn exec(self: &Self, prog: &const Prog, prog_start: usize, input: []const u8, slots: &ArrayList(?usize)) !bool {
+    pub fn exec(self: &Self, prog: &const Prog, prog_start: usize, input: &Input, slots: &ArrayList(?usize)) !bool {
         // Should never run this without first checking shouldExec and running only if true.
         debug.assert(shouldExec(prog, input));
 
@@ -77,7 +79,7 @@ pub const BacktrackVm = struct {
             .slots = slots,
         };
 
-        const t = Job { .Thread = Thread { .ip = prog_start, .input = InputBytes.init(input) }};
+        const t = Job { .Thread = Thread { .ip = prog_start, .input = input.clone() }};
         try state.jobs.append(t);
 
         while (state.jobs.popOrNull()) |job| {
@@ -165,7 +167,7 @@ pub const BacktrackVm = struct {
                     // Jump at end of loop
                 },
                 InstData.Split => |split| {
-                    const t = Job { .Thread = Thread { .ip = split, .input = input }};
+                    const t = Job { .Thread = Thread { .ip = split, .input = input.clone() }};
                     try state.jobs.append(t);
                 }
             }
@@ -176,7 +178,7 @@ pub const BacktrackVm = struct {
 
     // checks if we have visited this specific node and if not, set the bit and return true
     fn shouldVisit(state: &ExecState, ip: usize, at: usize) bool {
-        const BitsetType = @typeOf(state.visited).Child;
+        const BitsetType = ExecState.BitsetType;
         const BitsetShiftType = std.math.Log2Int(BitsetType);
 
         const size = @sizeOf(BitsetType);

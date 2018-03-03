@@ -37,6 +37,8 @@ const Compiler = compile.Compiler;
 const Prog = compile.Prog;
 const Inst = compile.Inst;
 
+const InputBytes = @import("input.zig").InputBytes;
+
 pub const Regex = struct {
     allocator: &Allocator,
     // Manages the prog state (TODO: Just store allocator in Prog)
@@ -92,24 +94,27 @@ pub const Regex = struct {
     }
 
     // does the regex match the entire input string? simply run through from the first position.
-    pub fn match(re: &Regex, input: []const u8) !bool {
-        return exec.exec(re.allocator, re.compiled, re.compiled.start, input, &re.slots);
+    pub fn match(re: &Regex, input_str: []const u8) !bool {
+        var input_bytes = InputBytes.init(input_str);
+        return exec.exec(re.allocator, re.compiled, re.compiled.start, &input_bytes.input, &re.slots);
     }
 
     // does the regexp match any region within the string? memchr to the first byte in the regex
     // (if possible) and then run the matcher from there. this is important.
-    pub fn partialMatch(re: &Regex, input: []const u8) !bool {
-        return exec.exec(re.allocator, re.compiled, re.compiled.find_start, input, &re.slots);
+    pub fn partialMatch(re: &Regex, input_str: []const u8) !bool {
+        var input_bytes = InputBytes.init(input_str);
+        return exec.exec(re.allocator, re.compiled, re.compiled.find_start, &input_bytes.input, &re.slots);
     }
 
     // where does the string match in the regex?
     //
     // the 0 capture is the entire match.
-    pub fn captures(re: &Regex, input: []const u8) !?Captures {
-        const is_match = try exec.exec(re.allocator, re.compiled, re.compiled.find_start, input, &re.slots);
+    pub fn captures(re: &Regex, input_str: []const u8) !?Captures {
+        var input_bytes = InputBytes.init(input_str);
+        const is_match = try exec.exec(re.allocator, re.compiled, re.compiled.find_start, &input_bytes.input, &re.slots);
 
         if (is_match) {
-            return Captures.init(input, &re.slots);
+            return Captures.init(input_str, &re.slots);
         } else {
             return null;
         }

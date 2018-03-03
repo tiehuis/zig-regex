@@ -2,6 +2,7 @@ const exec = @import("exec.zig").exec;
 const debug = @import("std").debug;
 const Parser = @import("parse.zig").Parser;
 const Regex = @import("regex.zig").Regex;
+const InputBytes = @import("input.zig").InputBytes;
 
 const std = @import("std");
 const ArrayList = std.ArrayList;
@@ -25,8 +26,11 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
     var pike = PikeVm.init(re.allocator);
     var pike_slots = ArrayList(?usize).init(re.allocator);
 
-    const pike_result = pike.exec(re.compiled, re.compiled.find_start, to_match, &pike_slots) catch unreachable;
-    const backtrack_result = backtrack.exec(re.compiled, re.compiled.find_start, to_match, &backtrack_slots) catch unreachable;
+    var input1 = InputBytes.init(to_match).input;
+    const pike_result = pike.exec(re.compiled, re.compiled.find_start, &input1, &pike_slots) catch unreachable;
+
+    var input2 = InputBytes.init(to_match).input;
+    const backtrack_result = backtrack.exec(re.compiled, re.compiled.find_start, &input2, &backtrack_slots) catch unreachable;
 
     // NOTE: equality on nullables? this is really bad
     var slots_equal = true;

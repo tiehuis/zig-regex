@@ -17,7 +17,7 @@ const Parser = parse.Parser;
 const Assertion = parse.Assertion;
 const Prog = compile.Prog;
 const InstData = compile.InstData;
-const InputBytes = @import("input.zig").InputBytes;
+const Input = @import("input.zig").Input;
 
 const Thread = struct {
     pc: usize,
@@ -35,7 +35,7 @@ pub const PikeVm = struct {
         };
     }
 
-    pub fn exec(self: &Self, prog: &const Prog, prog_start: usize, str_input: []const u8, slots: &ArrayList(?usize)) !bool {
+    pub fn exec(self: &Self, prog: &const Prog, prog_start: usize, input: &Input, slots: &ArrayList(?usize)) !bool {
         var clist = ArrayList(Thread).init(self.allocator);
         defer clist.deinit();
 
@@ -47,8 +47,6 @@ pub const PikeVm = struct {
 
         const t = Thread { .pc = prog_start, .slots = slots };
         try clist.append(t);
-
-        var input = InputBytes.init(str_input);
 
         while (!input.isConsumed()) : (input.advance()) {
             while (clist.popOrNull()) |thread| {
