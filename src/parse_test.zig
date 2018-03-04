@@ -109,7 +109,7 @@ fn reprIndent(out: &StaticOutStream, e: &Expr, indent: usize) error!void {
             try reprIndent(out, repeat.subexpr, indent + 1);
         },
         Expr.ByteClass => |class| {
-            try out.stream.print("bset");
+            try out.stream.print("bset(");
             for (class.ranges.toSliceConst()) |r| {
                 try out.stream.print("[");
                 try out.printCharEscaped(r.min);
@@ -150,6 +150,10 @@ fn check(re: []const u8, expected_ast: []const u8) void {
     if (!mem.eql(u8, trimmed_ast, trimmed_expected_ast)) {
         debug.warn(
             \\
+            \\-- parsed the regex
+            \\
+            \\{}
+            \\
             \\-- expected the following
             \\
             \\{}
@@ -159,6 +163,7 @@ fn check(re: []const u8, expected_ast: []const u8) void {
             \\{}
             \\
         ,
+            re,
             trimmed_expected_ast,
             trimmed_ast,
         );
@@ -378,7 +383,7 @@ test "regex parse tests" {
     );
 
     check(
-        "\\a\\f\\t\\n\\r\\v"
+        \\\a\f\t\n\r\v
     ,
         \\cat
         \\ lit(0x7)
@@ -390,7 +395,7 @@ test "regex parse tests" {
     );
 
     check(
-        "\\\\\\.\\+\\*\\?\\(\\)\\|\\[\\]\\{\\}\\^\\$"
+        \\\\\.\+\*\?\(\)\|\[\]\{\}\^\$
     ,
         \\cat
         \\ lit(\)
@@ -451,7 +456,75 @@ test "regex parse tests" {
         \\ lit(4)
     );
 
-    // TODO: Test character classes and escaping
+    check(
+        \\[a]
+    ,
+        \\bset([a-a])
+    );
+
+    check(
+        \\[\x00]
+    ,
+        \\bset([0x0-0x0])
+    );
+
+    check(
+        \\[\n]
+    ,
+        \\bset([\n-\n])
+    );
+
+    check(
+        \\[^a]
+    ,
+        \\bset([0x0-`][b-0xff])
+    );
+
+    check(
+        \\[^\x00]
+    ,
+        \\bset([0x1-0xff])
+    );
+
+    check(
+        \\[^\n]
+    ,
+        \\bset([0x0-\t][0xb-0xff])
+    );
+
+    check(
+        \\[]]
+    ,
+        \\bset([]-]])
+    );
+
+    check(
+        \\[]\[]
+    ,
+        \\bset([[-[][]-]])
+    );
+
+    check(
+        \\[\[]]
+    ,
+        \\cat
+        \\ bset([[-[])
+        \\ lit(])
+    );
+
+    check(
+        \\[]-]
+    ,
+        \\bset([---][]-]])
+    );
+
+    check(
+        \\[-]]
+    ,
+        \\cat
+        \\ bset([---])
+        \\ lit(])
+    );
 
     // TODO: Test error codes
 }

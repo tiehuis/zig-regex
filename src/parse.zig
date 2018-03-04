@@ -438,74 +438,7 @@ pub const Parser = struct {
                     try p.stack.append(r);
                 },
                 '[' => {
-                    var class = ByteClass.init(p.allocator);
-
-                    var negate = false;
-                    if (it.peekIs('^')) {
-                        it.bump();
-                        negate = true;
-                    }
-
-                    while (!it.peekIs(']')) : (it.bump()) {
-                        if (it.peek() == null) {
-                            return error.UnclosedBrackets;
-                        }
-
-                        const chp = ??it.peek();
-
-                        // If this is a byte-class escape, we cannot expect an '-' range after it.
-                        // Accept the following - as a literal (may be bad behaviour).
-                        //
-                        // If it is not, then we can and it is fine.
-                        var range: ByteRange = undefined;
-
-                        if (chp == '\\') {
-                            it.bump();
-
-                            // parseEscape returns a literal or byteclass so reformat
-                            var r = try p.parseEscape();
-                            // NOTE: this is bumped on loop
-                            it.index -= 1;
-                            switch (*r) {
-                                Expr.Literal => |value| {
-                                    range = ByteRange { .min = value, .max = value };
-                                },
-                                Expr.ByteClass => |vv| {
-                                    // '-' doesn't make sense following this, merge class here
-                                    // and continue next.
-                                    try class.mergeClass(vv);
-                                    continue;
-                                },
-                                else => unreachable,
-                            }
-                        } else {
-                            range = ByteRange { .min = chp, .max = chp };
-                        }
-
-                        // is this a range?
-                        if (it.peekNextIs('-')) {
-                            it.bump();
-                            it.bump();
-
-                            if (it.peekIs(']')) {
-                                // treat the '-' as a literal instead
-                                it.index -= 1;
-                            } else {
-                                range.max = ??it.peek();
-                            }
-                        }
-
-                        try class.addRange(range);
-                    }
-                    it.bump();
-
-                    if (negate) {
-                        try class.negate();
-                    }
-
-                    var r = try p.createExpr();
-                    *r = Expr { .ByteClass = class };
-                    try p.stack.append(r);
+                    try p.parseCharClass();
                 },
                 // Don't handle alternation just yet, parentheses group together arguments into
                 // a sub-expression only.
@@ -775,6 +708,89 @@ pub const Parser = struct {
 
         var r = try p.createExpr();
         *r = Expr { .Repeat = repeat };
+        try p.stack.append(r);
+    }
+
+    // NOTE: We don't handle needed character classes.
+    fn parseCharClass(p: &Parser) !void {
+        var it = &p.it;
+
+        var class = ByteClass.init(p.allocator);
+
+        var negate = false;
+        if (it.peekIs('^')) {
+            it.bump();
+            negate = true;
+        }
+
+        // First '[' in a multi-class is always treated as a literal. This disallows
+        // the empty byte-set '[]'.
+        if (it.peekIs(']')) {
+            it.bump();
+
+            const range = ByteRange { .min = ']', .max = ']' };
+            try class.addRange(range);
+        }
+
+        while (!it.peekIs(']')) : (it.bump()) {
+            if (it.peek() == null) {
+                return error.UnclosedBrackets;
+            }
+
+            const chp = ??it.peek();
+
+            // If this is a byte-class escape, we cannot expect an '-' range after it.
+            // Accept the following - as a literal (may be bad behaviour).
+            //
+            // If it is not, then we can and it is fine.
+            var range: ByteRange = undefined;
+
+            if (chp == '\\') {
+                it.bump();
+
+                // parseEscape returns a literal or byteclass so reformat
+                var r = try p.parseEscape();
+                // NOTE: this is bumped on loop
+                it.index -= 1;
+                switch (*r) {
+                    Expr.Literal => |value| {
+                        range = ByteRange { .min = value, .max = value };
+                    },
+                    Expr.ByteClass => |vv| {
+                        // '-' doesn't make sense following this, merge class here
+                        // and continue next.
+                        try class.mergeClass(vv);
+                        continue;
+                    },
+                    else => unreachable,
+                }
+            } else {
+                range = ByteRange { .min = chp, .max = chp };
+            }
+
+            // is this a range?
+            if (it.peekNextIs('-')) {
+                it.bump();
+                it.bump();
+
+                if (it.peekIs(']')) {
+                    // treat the '-' as a literal instead
+                    it.index -= 1;
+                } else {
+                    range.max = ??it.peek();
+                }
+            }
+
+            try class.addRange(range);
+        }
+        it.bump();
+
+        if (negate) {
+            try class.negate();
+        }
+
+        var r = try p.createExpr();
+        *r = Expr { .ByteClass = class };
         try p.stack.append(r);
     }
 
