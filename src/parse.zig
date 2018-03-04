@@ -302,6 +302,7 @@ pub const ParseError = error {
     ExcessiveRepeatCount,
     OpenEscapeCode,
     UnclosedHexCharacterCode,
+    UnrecognizedEscapeCode,
 };
 
 const repeat_max_length = 1000;
@@ -924,8 +925,7 @@ pub const Parser = struct {
                 }
             },
             else => {
-                debug.warn("code: 0x{x}\n", ch);
-                @panic("unknown escape code");
+                return error.UnrecognizedEscapeCode;
             },
         }
     }

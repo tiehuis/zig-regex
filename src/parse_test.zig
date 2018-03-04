@@ -6,6 +6,7 @@ const OutStream = std.io.OutStream;
 const parse = @import("parse.zig");
 const Parser = parse.Parser;
 const Expr = parse.Expr;
+const ParseError = parse.ParseError;
 
 // Note: Switch to OutStream
 var global_buffer: [2048]u8 = undefined;
@@ -172,9 +173,8 @@ fn check(re: []const u8, expected_ast: []const u8) void {
     }
 }
 
-test "regex parse tests" {
-    // These are taken off rust-regex for the moment.
-
+// These are taken off rust-regex for the moment.
+test "parse simple" {
     check(
         \\
     ,
@@ -381,7 +381,9 @@ test "regex parse tests" {
     ,
         \\dot
     );
+}
 
+test "parse escape" {
     check(
         \\\a\f\t\n\r\v
     ,
@@ -455,7 +457,9 @@ test "regex parse tests" {
         \\ lit(S)
         \\ lit(4)
     );
+}
 
+test "parse character classes" {
     check(
         \\[a]
     ,
@@ -525,6 +529,408 @@ test "regex parse tests" {
         \\ bset([---])
         \\ lit(])
     );
+}
 
-    // TODO: Test error codes
+fn checkError(re: []const u8, expected_err: ParseError) void {
+    var p = Parser.init(debug.global_allocator);
+    const parse_result = p.parse(re);
+
+    if (parse_result) |expr| {
+        const ast = repr(expr) catch unreachable;
+        const spaces = []const u8 { ' ', '\n' };
+        const trimmed_ast = mem.trim(u8, ast, spaces);
+
+        debug.warn(
+            \\
+            \\-- parsed the regex
+            \\
+            \\{}
+            \\
+            \\-- expected the following
+            \\
+            \\{}
+            \\
+            \\-- but instead got
+            \\
+            \\{}
+            \\
+            \\
+        ,
+            re,
+            @errorName(expected_err),
+            trimmed_ast,
+        );
+
+        @panic("assertion failure");
+    }
+    else |found_err| {
+        if (found_err != expected_err) {
+            debug.warn(
+                \\
+                \\-- parsed the regex
+                \\
+                \\{}
+                \\
+                \\-- expected the following
+                \\
+                \\{}
+                \\
+                \\-- but instead got
+                \\
+                \\{}
+                \\
+                \\
+            ,
+                re,
+                @errorName(expected_err),
+                @errorName(found_err),
+            );
+
+            @panic("assertion failure");
+        }
+    }
+}
+
+test "parse errors repeat" {
+    checkError(
+        \\(*
+    ,
+        ParseError.MissingRepeatArgument
+    );
+
+    checkError(
+        \\({5}
+    ,
+        ParseError.MissingRepeatArgument
+    );
+
+    //checkError(
+    //    \\{5}
+    //,
+    //    ParseError.MissingRepeatArgument
+    //);
+
+    checkError(
+        \\a**
+    ,
+        ParseError.MissingRepeatArgument
+    );
+
+    checkError(
+        \\a|*
+    ,
+        ParseError.MissingRepeatArgument
+    );
+
+    checkError(
+        \\a*{5}
+    ,
+        ParseError.MissingRepeatArgument
+    );
+
+    checkError(
+        \\a|{5}
+    ,
+        ParseError.MissingRepeatArgument
+    );
+
+    //checkError(
+    //    \\a{}
+    //,
+    //    ParseError.MissingRepeatArgument
+    //);
+
+    checkError(
+        \\a{5
+    ,
+        ParseError.UnclosedRepeat
+    );
+
+    //checkError(
+    //    \\a{xyz
+    //,
+    //    ParseError.UnclosedRepeat
+    //);
+
+    //checkError(
+    //    \\a{12,xyz
+    //,
+    //    ParseError.UnclosedRepeat
+    //);
+
+    checkError(
+        \\a{999999999999}
+    ,
+        ParseError.ExcessiveRepeatCount
+    );
+
+    checkError(
+        \\a{1,999999999999}
+    ,
+        ParseError.ExcessiveRepeatCount
+    );
+
+    checkError(
+        \\a{12x}
+    ,
+        ParseError.UnclosedRepeat
+    );
+
+    checkError(
+        \\a{1,12x}
+    ,
+        ParseError.UnclosedRepeat
+    );
+}
+
+test "parse errors alternate" {
+    //checkError(
+    //    \\|a
+    //,
+    //    ParseError.UnclosedRepeat
+    //);
+
+    //checkError(
+    //    \\(|a)
+    //,
+    //    ParseError.UnclosedRepeat
+    //);
+
+    //checkError(
+    //    \\a||
+    //,
+    //    ParseError.UnclosedRepeat
+    //);
+
+    checkError(
+        \\)
+    ,
+        ParseError.UnopenedParentheses
+    );
+
+    checkError(
+        \\ab)
+    ,
+        ParseError.UnopenedParentheses
+    );
+
+    checkError(
+        \\a|b)
+    ,
+        ParseError.UnopenedParentheses
+    );
+
+    //checkError(
+    //    \\(a|b
+    //,
+    //    ParseError.UnopenedParentheses
+    //);
+
+    //checkError(
+    //    \\(a|)
+    //,
+    //    ParseError.UnopenedParentheses
+    //);
+
+    //checkError(
+    //    \\()
+    //,
+    //    ParseError.UnopenedParentheses
+    //);
+
+    checkError(
+        \\ab(xy
+    ,
+        ParseError.UnbalancedParentheses
+    );
+
+    //checkError(
+    //    \\()
+    //,
+    //    ParseError.UnopenedParentheses
+    //);
+
+    //checkError(
+    //    \\a|
+    //,
+    //    ParseError.UnbalancedParentheses
+    //);
+}
+
+test "parse errors escape" {
+    checkError(
+        "\\"
+    ,
+        ParseError.OpenEscapeCode
+    );
+
+    checkError(
+        "\\m"
+    ,
+        ParseError.UnrecognizedEscapeCode
+    );
+
+    //checkError(
+    //    "\\x"
+    //,
+    //    ParseError.UnrecognizedEscapeCode
+    //);
+
+    //checkError(
+    //    "\\xA"
+    //,
+    //    ParseError.UnrecognizedEscapeCode
+    //);
+
+    //checkError(
+    //    "\\xAG"
+    //,
+    //    ParseError.UnrecognizedEscapeCode
+    //);
+
+    //checkError(
+    //    "\\x{"
+    //,
+    //    ParseError.UnrecognizedEscapeCode
+    //);
+
+    //checkError(
+    //    "\\x{A"
+    //,
+    //    ParseError.UnrecognizedEscapeCode
+    //);
+
+    //checkError(
+    //    "\\x{AG}"
+    //,
+    //    ParseError.UnrecognizedEscapeCode
+    //);
+
+    //checkError(
+    //    "\\x{D800}"
+    //,
+    //    ParseError.UnrecognizedEscapeCode
+    //);
+
+    //checkError(
+    //    "\\x{110000}"
+    //,
+    //    ParseError.UnrecognizedEscapeCode
+    //);
+
+    //checkError(
+    //    "\\x{99999999999999}"
+    //,
+    //    ParseError.UnrecognizedEscapeCode
+    //);
+}
+
+test "parse errors character class" {
+    checkError(
+        \\[
+    ,
+        ParseError.UnclosedBrackets
+    );
+
+    checkError(
+        \\[^
+    ,
+        ParseError.UnclosedBrackets
+    );
+
+    checkError(
+        \\[a
+    ,
+        ParseError.UnclosedBrackets
+    );
+
+    checkError(
+        \\[^a
+    ,
+        ParseError.UnclosedBrackets
+    );
+
+    //checkError(
+    //    \\[a-
+    //,
+    //    ParseError.UnclosedBrackets
+    //);
+
+    //checkError(
+    //    \\[^a-
+    //,
+    //    ParseError.UnclosedBrackets
+    //);
+
+    checkError(
+        \\[---
+    ,
+        ParseError.UnclosedBrackets
+    );
+
+    checkError(
+        \\[\A]
+    ,
+        ParseError.UnrecognizedEscapeCode
+    );
+
+    //checkError(
+    //    \\[a-\d]
+    //,
+    //    ParseError.UnclosedBrackets
+    //);
+
+    //checkError(
+    //    \\[a-\A]
+    //,
+    //    ParseError.UnrecognizedEscapeCode
+    //);
+
+    checkError(
+        \\[\A-a]
+    ,
+        ParseError.UnrecognizedEscapeCode
+    );
+
+    //checkError(
+    //    \\[z-a]
+    //,
+    //    ParseError.UnclosedBrackets
+    //);
+
+    checkError(
+        \\[]
+    ,
+        ParseError.UnclosedBrackets
+    );
+
+    checkError(
+        \\[^]
+    ,
+        ParseError.UnclosedBrackets
+    );
+
+    //checkError(
+    //    \\[^\d\D]
+    //,
+    //    ParseError.UnclosedBrackets
+    //);
+
+    //checkError(
+    //    \\[~~]
+    //,
+    //    ParseError.UnclosedBrackets
+    //);
+
+    //checkError(
+    //    \\[+--]
+    //,
+    //    ParseError.UnclosedBrackets
+    //);
+
+    //checkError(
+    //    \\[a-a--\xFF]
+    //,
+    //    ParseError.UnclosedBrackets
+    //);
 }
