@@ -33,6 +33,27 @@ const StaticOutStream = struct {
         mem.copy(u8, self.buffer[self.last..], bytes);
         self.last += bytes.len;
     }
+
+    pub fn printCharEscaped(self: &StaticOutStream, ch: u8) !void {
+        switch (ch) {
+            '\t' => {
+                try self.stream.print("\\t");
+            },
+            '\r' => {
+                try self.stream.print("\\r");
+            },
+            '\n' => {
+                try self.stream.print("\\n");
+            },
+            // printable characters
+            32 ... 126 => {
+                try self.stream.print("{c}", ch);
+            },
+            else => {
+                try self.stream.print("0x{x}", ch);
+            },
+        }
+    }
 };
 
 // Return a minimal string representation of the expression tree.
@@ -56,7 +77,9 @@ fn reprIndent(out: &StaticOutStream, e: &Expr, indent: usize) error!void {
             try out.stream.print("empty({})\n", @tagName(assertion));
         },
         Expr.Literal => |lit| {
-            try out.stream.print("lit({c})\n", lit);
+            try out.stream.print("lit(");
+            try out.printCharEscaped(lit);
+            try out.stream.print(")\n");
         },
         Expr.Capture => |subexpr| {
             try out.stream.print("cap\n");
@@ -87,8 +110,13 @@ fn reprIndent(out: &StaticOutStream, e: &Expr, indent: usize) error!void {
         },
         Expr.ByteClass => |class| {
             try out.stream.print("bset");
-            for (class.ranges.toSliceConst()) |r|
-                try out.stream.print("[{}-{}]", r.min, r.max);
+            for (class.ranges.toSliceConst()) |r| {
+                try out.stream.print("[");
+                try out.printCharEscaped(r.min);
+                try out.stream.print("-");
+                try out.printCharEscaped(r.max);
+                try out.stream.print("]");
+            }
             try out.stream.print(")\n");
         },
         // TODO: Can we get better type unification on enum variants with the same type?
@@ -349,7 +377,79 @@ test "regex parse tests" {
         \\dot
     );
 
-    // TODO: Escaping
+    check(
+        "\\a\\f\\t\\n\\r\\v"
+    ,
+        \\cat
+        \\ lit(0x7)
+        \\ lit(0xc)
+        \\ lit(\t)
+        \\ lit(\n)
+        \\ lit(\r)
+        \\ lit(0xb)
+    );
+
+    check(
+        "\\\\\\.\\+\\*\\?\\(\\)\\|\\[\\]\\{\\}\\^\\$"
+    ,
+        \\cat
+        \\ lit(\)
+        \\ lit(.)
+        \\ lit(+)
+        \\ lit(*)
+        \\ lit(?)
+        \\ lit(()
+        \\ lit())
+        \\ lit(|)
+        \\ lit([)
+        \\ lit(])
+        \\ lit({)
+        \\ lit(})
+        \\ lit(^)
+        \\ lit($)
+    );
+
+    check(
+        "\\123"
+    ,
+        \\lit(S)
+    );
+
+    check(
+        "\\1234"
+    ,
+        \\cat
+        \\ lit(S)
+        \\ lit(4)
+    );
+
+    check(
+        "\\x53"
+    ,
+        \\lit(S)
+    );
+
+    check(
+        "\\x534"
+    ,
+        \\cat
+        \\ lit(S)
+        \\ lit(4)
+    );
+
+    check(
+        "\\x{53}"
+    ,
+        \\lit(S)
+    );
+
+    check(
+        "\\x{53}4"
+    ,
+        \\cat
+        \\ lit(S)
+        \\ lit(4)
+    );
 
     // TODO: Test character classes and escaping
 

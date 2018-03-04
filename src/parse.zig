@@ -56,8 +56,7 @@ pub const Expr = union(enum) {
     Capture: &Expr,
     // *, +, ?
     Repeat: Repeater,
-    // Character class [a-z&&0-9]
-    // NOTE: We don't handle the && union just yet.
+    // Character class [a-z0-9]
     ByteClass: ByteClass,
     // Concatenation
     Concat: ArrayList(&Expr),
@@ -83,6 +82,27 @@ pub const Expr = union(enum) {
         e.dumpIndent(0);
     }
 
+    pub fn printCharEscaped(ch: u8) void {
+        switch (ch) {
+            '\t' => {
+                debug.warn("\\t");
+            },
+            '\r' => {
+                debug.warn("\\r");
+            },
+            '\n' => {
+                debug.warn("\\n");
+            },
+            // printable characters
+            32 ... 126 => {
+                debug.warn("{c}", ch);
+            },
+            else => {
+                debug.warn("0x{x}", ch);
+            },
+        }
+    }
+
     fn dumpIndent(e: &const Expr, indent: usize) void {
         var i: usize = 0;
         while (i < indent) : (i += 1) {
@@ -97,7 +117,9 @@ pub const Expr = union(enum) {
                 debug.warn("{}({})\n", @tagName(*e), @tagName(assertion));
             },
             Expr.Literal => |lit| {
-                debug.warn("{}({c})\n", @tagName(*e), lit);
+                debug.warn("{}(", @tagName(*e));
+                printCharEscaped(lit);
+                debug.warn(")\n");
             },
             Expr.Capture => |subexpr| {
                 debug.warn("{}\n", @tagName(*e));
@@ -110,8 +132,13 @@ pub const Expr = union(enum) {
             },
             Expr.ByteClass => |class| {
                 debug.warn("{}(", @tagName(*e));
-                for (class.ranges.toSliceConst()) |r|
-                    debug.warn("[{}-{}]", r.min, r.max);
+                for (class.ranges.toSliceConst()) |r| {
+                    debug.warn("[");
+                    printCharEscaped(r.min);
+                    debug.warn("-");
+                    printCharEscaped(r.max);
+                    debug.warn("]");
+                }
                 debug.warn(")\n");
             },
             // TODO: Can we get better type unification on enum variants with the same type?
@@ -179,6 +206,13 @@ const StringIterator = struct {
         }
     }
 
+    // Reset the stream back one character
+    pub fn bumpBack(it: &Self) void {
+        if (it.index > 0) {
+            it.index -= 1;
+        }
+    }
+
     // Look at the nth character in the stream without advancing.
     fn peekAhead(it: &const Self, comptime n: usize) ?u8 {
         if (it.index + n < it.slice.len) {
@@ -214,11 +248,22 @@ const StringIterator = struct {
     // Read an integer from the stream. Any non-digit characters stops the parsing chain.
     //
     // Error if no digits were read.
+    //
     // TODO: Non character word-boundary instead?
     pub fn readInt(it: &Self, comptime T: type, comptime radix: u8) !T {
+        return it.readIntN(T, radix, @maxValue(usize));
+    }
+
+    // Read an integer from the stream, limiting the read to N characters at most.
+    pub fn readIntN(it: &Self, comptime T: type, comptime radix: u8, comptime N: usize) !T {
         const start = it.index;
 
-        while (it.peek()) |ch| {
+        var i: usize = 0;
+        while (it.peek()) |ch| : (i += 1) {
+            if (i >= N) {
+                break;
+            }
+
             if (charToDigit(ch, radix)) |is_valid| {
                 it.bump();
             } else |_| {
@@ -256,6 +301,7 @@ pub const ParseError = error {
     UnclosedBrackets,
     ExcessiveRepeatCount,
     OpenEscapeCode,
+    UnclosedHexCharacterCode,
 };
 
 const repeat_max_length = 1000;
@@ -821,7 +867,50 @@ pub const Parser = struct {
                 *r = Expr { .ByteClass = s };
                 return r;
             },
-            else => @panic("unknown escape code"),
+            '0' ... '9' => {
+                p.it.bumpBack();
+
+                // octal integer up to 3 digits, always succeeds since we have at least one digit
+                // TODO: u32 codepoint and not u8
+                const value = p.it.readIntN(u8, 8, 3) catch unreachable;
+
+                var r = try p.createExpr();
+                *r = Expr { .Literal = value };
+                return r;
+            },
+            'x' => {
+                p.it.skipSpaces();
+
+                // '\x{2423}
+                if (p.it.peekIs('{')) {
+                    p.it.bump();
+
+                    // TODO: u32 codepoint and not u8
+                    const value = try p.it.readInt(u8, 16);
+
+                    // TODO: Check range as well and if valid unicode codepoint
+                    if (!p.it.peekIs('}')) {
+                        return error.UnclosedHexCharacterCode;
+                    }
+                    p.it.bump();
+
+                    var r = try p.createExpr();
+                    *r = Expr { .Literal = value };
+                    return r;
+                }
+                // '\x23
+                else {
+                    const value = try p.it.readIntN(u8, 16, 2);
+
+                    var r = try p.createExpr();
+                    *r = Expr { .Literal = value };
+                    return r;
+                }
+            },
+            else => {
+                debug.warn("code: 0x{x}\n", ch);
+                @panic("unknown escape code");
+            },
         }
     }
 };
