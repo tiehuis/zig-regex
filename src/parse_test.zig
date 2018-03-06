@@ -2,6 +2,7 @@ const std = @import("std");
 const debug = std.debug;
 const mem = std.mem;
 const OutStream = std.io.OutStream;
+const FixedBufferAllocator = std.heap.FixedBufferAllocator;
 
 const parse = @import("parse.zig");
 const Parser = parse.Parser;
@@ -138,8 +139,12 @@ fn reprIndent(out: &StaticOutStream, e: &Expr, indent: usize) error!void {
     }
 }
 
+// Debug global allocator is too small for our tests
+var fbuffer: [800000]u8 = undefined;
+var fixed_allocator = FixedBufferAllocator.init(fbuffer[0..]);
+
 fn check(re: []const u8, expected_ast: []const u8) void {
-    var p = Parser.init(debug.global_allocator);
+    var p = Parser.init(&fixed_allocator.allocator);
     const expr = p.parse(re) catch unreachable;
 
     var ast = repr(expr) catch unreachable;

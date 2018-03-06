@@ -162,14 +162,21 @@ pub const Prog = struct {
     find_start: InstPtr,
     // Max number of slots required
     slot_count: usize,
+    // Allocator which owns the instructions
+    allocator: &Allocator,
 
-    pub fn init(a: []const Inst, find_start: usize, slot_count: usize) Prog {
+    pub fn init(allocator: &Allocator, a: []const Inst, find_start: usize, slot_count: usize) Prog {
         return Prog {
+            .allocator = allocator,
             .insts = a,
             .start = 0,
             .find_start = find_start,
             .slot_count = slot_count,
         };
+    }
+
+    pub fn deinit(p: &Prog) void {
+        self.allocator.free(insts);
     }
 
     pub fn dump(s: &const Prog) void {
@@ -278,7 +285,7 @@ pub const Compiler = struct {
         };
         try p.appendSlice(fragment);
 
-        return Prog.init(p.toOwnedSlice(), fragment_start, c.capture_index);
+        return Prog.init(p.allocator, p.toOwnedSlice(), fragment_start, c.capture_index);
     }
 
     fn compileInternal(c: &Compiler, expr: &const Expr) Allocator.Error!Patch {

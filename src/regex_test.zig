@@ -6,7 +6,7 @@ const FixedBufferAllocator = @import("std").heap.FixedBufferAllocator;
 const mem = @import("std").mem;
 
 // Debug global allocator is too small for our tests
-var buffer: [300000]u8 = undefined;
+var buffer: [800000]u8 = undefined;
 var fixed_allocator = FixedBufferAllocator.init(buffer[0..]);
 
 fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {

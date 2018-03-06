@@ -2,6 +2,7 @@ const std = @import("std");
 const mem = std.mem;
 const fmt = std.fmt;
 const Allocator = std.mem.Allocator;
+const ArenaAllocator = std.heap.ArenaAllocator;
 const ArrayList = std.ArrayList;
 const debug = std.debug;
 
@@ -309,13 +310,13 @@ const repeat_max_length = 1000;
 
 /// Parser manages the parsing state and converts a regular expression string into an expression tree.
 ///
-/// The resulting expression is tied to the parsing state.
+/// The resulting expression is tied to the Parser which generated it.
 pub const Parser = struct {
     // Parse expression stack
     stack: ArrayList(&Expr),
-    // List of references to actual allocate nodes
-    node_list: ArrayList(&Expr),
-    // Allocator for lists/node generation
+    // ArenaAllocator for generating all expression nodes
+    arena: ArenaAllocator,
+    // Allocator for temporary lists/items
     allocator: &Allocator,
 
     // Internal parse state.
@@ -324,7 +325,7 @@ pub const Parser = struct {
     pub fn init(a: &Allocator) Parser {
         return Parser {
             .stack = ArrayList(&Expr).init(a),
-            .node_list = ArrayList(&Expr).init(a),
+            .arena = ArenaAllocator.init(a),
             .allocator = a,
             .it = undefined,
         };
@@ -332,19 +333,15 @@ pub const Parser = struct {
 
     pub fn deinit(p: &Parser) void {
         p.stack.deinit();
-
-        for (p.node_list.toSliceConst()) |node| {
-            p.allocator.destroy(node);
-        }
+        p.arena.deinit();
     }
 
     pub fn reset(p: &Parser) void {
         p.stack.shrink(0);
 
-        for (p.node_list) |node| {
-            p.allocator.destroy(node);
-        }
-        p.node_list.shrink(0);
+        // Note: A shrink or reset on the ArenaAllocator would be nice.
+        p.arena.deinit();
+        p.arena = ArenaAllocator.init(p.allocator);
     }
 
     fn popStack(p: &Parser) !&Expr {
@@ -362,12 +359,6 @@ pub const Parser = struct {
         } else {
             return error.MissingRepeatArgument;
         }
-    }
-
-    fn createExpr(p: &Parser) !&Expr {
-        const r = try p.allocator.create(Expr);
-        try p.node_list.append(r);
-        return r;
     }
 
     fn isPunctuation(c: u8) bool {
@@ -434,7 +425,7 @@ pub const Parser = struct {
                     try p.parseRepeat(min, max);
                 },
                 '.' => {
-                    var r = try p.createExpr();
+                    var r = try p.arena.allocator.create(Expr);
                     *r = Expr.AnyCharNotNL;
                     try p.stack.append(r);
                 },
@@ -444,7 +435,7 @@ pub const Parser = struct {
                 // Don't handle alternation just yet, parentheses group together arguments into
                 // a sub-expression only.
                 '(' => {
-                    var r = try p.createExpr();
+                    var r = try p.arena.allocator.create(Expr);
                     *r = Expr.PseudoLeftParen;
                     try p.stack.append(r);
                 },
@@ -469,7 +460,7 @@ pub const Parser = struct {
                         switch (*e) {
                             // Existing alternation
                             Expr.Alternate => {
-                                var ra = try p.createExpr();
+                                var ra = try p.arena.allocator.create(Expr);
                                 mem.reverse(&Expr, concat.toSlice());
 
                                 if (concat.len == 1) {
@@ -488,7 +479,7 @@ pub const Parser = struct {
                                 // pop the left parentheses that must now exist
                                 debug.assert(*p.stack.pop() == Expr.PseudoLeftParen);
 
-                                var r = try p.createExpr();
+                                var r = try p.arena.allocator.create(Expr);
                                 *r = Expr { .Capture = e };
 
                                 try p.stack.append(r);
@@ -496,7 +487,7 @@ pub const Parser = struct {
                             },
                             // Existing parentheses, push new alternation
                             Expr.PseudoLeftParen => {
-                                var ra = try p.createExpr();
+                                var ra = try p.arena.allocator.create(Expr);
                                 mem.reverse(&Expr, concat.toSlice());
                                 *ra = Expr { .Concat = concat };
 
@@ -506,7 +497,7 @@ pub const Parser = struct {
                                     *ra = Expr { .Concat = concat };
                                 }
 
-                                var r = try p.createExpr();
+                                var r = try p.arena.allocator.create(Expr);
                                 *r = Expr { .Capture = ra };
 
                                 try p.stack.append(r);
@@ -534,7 +525,7 @@ pub const Parser = struct {
                         // would underflow, push a new alternation
                         if (p.stack.len == 0) {
                             // We need to create a single expr node for the alternation.
-                            var ra = try p.createExpr();
+                            var ra = try p.arena.allocator.create(Expr);
                             mem.reverse(&Expr, concat.toSlice());
 
                             if (concat.len == 1) {
@@ -543,7 +534,7 @@ pub const Parser = struct {
                                 *ra = Expr { .Concat = concat };
                             }
 
-                            var r = try p.createExpr();
+                            var r = try p.arena.allocator.create(Expr);
                             *r = Expr { .Alternate = ArrayList(&Expr).init(p.allocator) };
                             try r.Alternate.append(ra);
 
@@ -555,7 +546,7 @@ pub const Parser = struct {
                         switch (*e) {
                             // Existing alternation, combine
                             Expr.Alternate => {
-                                var ra = try p.createExpr();
+                                var ra = try p.arena.allocator.create(Expr);
                                 mem.reverse(&Expr, concat.toSlice());
 
                                 if (concat.len == 1) {
@@ -575,7 +566,7 @@ pub const Parser = struct {
                                 // re-push parentheses marker
                                 try p.stack.append(e);
 
-                                var ra = try p.createExpr();
+                                var ra = try p.arena.allocator.create(Expr);
                                 mem.reverse(&Expr, concat.toSlice());
 
                                 if (concat.len == 1) {
@@ -584,7 +575,7 @@ pub const Parser = struct {
                                     *ra = Expr { .Concat = concat };
                                 }
 
-                                var r = try p.createExpr();
+                                var r = try p.arena.allocator.create(Expr);
                                 *r = Expr { .Alternate = ArrayList(&Expr).init(p.allocator) };
                                 try r.Alternate.append(ra);
 
@@ -603,12 +594,12 @@ pub const Parser = struct {
                     try p.stack.append(r);
                 },
                 '^' => {
-                    var r = try p.createExpr();
+                    var r = try p.arena.allocator.create(Expr);
                     *r = Expr { .EmptyMatch = Assertion.BeginLine };
                     try p.stack.append(r);
                 },
                 '$' => {
-                    var r = try p.createExpr();
+                    var r = try p.arena.allocator.create(Expr);
                     *r = Expr { .EmptyMatch = Assertion.EndLine };
                     try p.stack.append(r);
                 },
@@ -620,7 +611,7 @@ pub const Parser = struct {
 
         // special case empty item
         if (p.stack.len == 0) {
-            var r = try p.createExpr();
+            var r = try p.arena.allocator.create(Expr);
             *r = Expr { .EmptyMatch = Assertion.None };
             return r;
         }
@@ -646,7 +637,7 @@ pub const Parser = struct {
         while (true) {
             if (p.stack.len == 0) {
                 // concat the items in reverse order and return
-                var r = try p.createExpr();
+                var r = try p.arena.allocator.create(Expr);
                 mem.reverse(&Expr, concat.toSlice());
 
                 if (concat.len == 1) {
@@ -665,7 +656,7 @@ pub const Parser = struct {
                 },
                 // Alternation at top-level, push concat and return
                 Expr.Alternate => {
-                    var ra = try p.createExpr();
+                    var ra = try p.arena.allocator.create(Expr);
                     mem.reverse(&Expr, concat.toSlice());
 
                     if (concat.len == 1) {
@@ -688,7 +679,7 @@ pub const Parser = struct {
     }
 
     fn parseLiteral(p: &Parser, ch: u8) !void {
-        var r = try p.createExpr();
+        var r = try p.arena.allocator.create(Expr);
         *r = Expr { .Literal = ch };
         try p.stack.append(r);
     }
@@ -707,7 +698,7 @@ pub const Parser = struct {
             .greedy = greedy,
         };
 
-        var r = try p.createExpr();
+        var r = try p.arena.allocator.create(Expr);
         *r = Expr { .Repeat = repeat };
         try p.stack.append(r);
     }
@@ -790,7 +781,7 @@ pub const Parser = struct {
             try class.negate();
         }
 
-        var r = try p.createExpr();
+        var r = try p.arena.allocator.create(Expr);
         *r = Expr { .ByteClass = class };
         try p.stack.append(r);
     }
@@ -804,7 +795,7 @@ pub const Parser = struct {
         }
 
         if (isPunctuation(ch)) {
-            var r = try p.createExpr();
+            var r = try p.arena.allocator.create(Expr);
             *r = Expr { .Literal = ch };
             return r;
         }
@@ -812,32 +803,32 @@ pub const Parser = struct {
         switch (ch) {
             // escape chars
             'a' => {
-                var r = try p.createExpr();
+                var r = try p.arena.allocator.create(Expr);
                 *r = Expr { .Literal = '\x07' };
                 return r;
             },
             'f' => {
-                var r = try p.createExpr();
+                var r = try p.arena.allocator.create(Expr);
                 *r = Expr { .Literal = '\x0c' };
                 return r;
             },
             'n' => {
-                var r = try p.createExpr();
+                var r = try p.arena.allocator.create(Expr);
                 *r = Expr { .Literal = '\n' };
                 return r;
             },
             'r' => {
-                var r = try p.createExpr();
+                var r = try p.arena.allocator.create(Expr);
                 *r = Expr { .Literal = '\r' };
                 return r;
             },
             't' => {
-                var r = try p.createExpr();
+                var r = try p.arena.allocator.create(Expr);
                 *r = Expr { .Literal = '\t' };
                 return r;
             },
             'v' => {
-                var r = try p.createExpr();
+                var r = try p.arena.allocator.create(Expr);
                 *r = Expr { .Literal = '\x0b' };
                 return r;
             },
@@ -845,42 +836,42 @@ pub const Parser = struct {
             's' => {
                 var s = try ByteClassTemplates.Whitespace(p.allocator);
 
-                var r = try p.createExpr();
+                var r = try p.arena.allocator.create(Expr);
                 *r = Expr { .ByteClass = s };
                 return r;
             },
             'S' => {
                 var s = try ByteClassTemplates.NonWhitespace(p.allocator);
 
-                var r = try p.createExpr();
+                var r = try p.arena.allocator.create(Expr);
                 *r = Expr { .ByteClass = s };
                 return r;
             },
             'w' => {
                 var s = try ByteClassTemplates.AlphaNumeric(p.allocator);
 
-                var r = try p.createExpr();
+                var r = try p.arena.allocator.create(Expr);
                 *r = Expr { .ByteClass = s };
                 return r;
             },
             'W' => {
                 var s = try ByteClassTemplates.NonAlphaNumeric(p.allocator);
 
-                var r = try p.createExpr();
+                var r = try p.arena.allocator.create(Expr);
                 *r = Expr { .ByteClass = s };
                 return r;
             },
             'd' => {
                 var s = try ByteClassTemplates.Digits(p.allocator);
 
-                var r = try p.createExpr();
+                var r = try p.arena.allocator.create(Expr);
                 *r = Expr { .ByteClass = s };
                 return r;
             },
             'D' => {
                 var s = try ByteClassTemplates.NonDigits(p.allocator);
 
-                var r = try p.createExpr();
+                var r = try p.arena.allocator.create(Expr);
                 *r = Expr { .ByteClass = s };
                 return r;
             },
@@ -891,7 +882,7 @@ pub const Parser = struct {
                 // TODO: u32 codepoint and not u8
                 const value = p.it.readIntN(u8, 8, 3) catch unreachable;
 
-                var r = try p.createExpr();
+                var r = try p.arena.allocator.create(Expr);
                 *r = Expr { .Literal = value };
                 return r;
             },
@@ -911,7 +902,7 @@ pub const Parser = struct {
                     }
                     p.it.bump();
 
-                    var r = try p.createExpr();
+                    var r = try p.arena.allocator.create(Expr);
                     *r = Expr { .Literal = value };
                     return r;
                 }
@@ -919,7 +910,7 @@ pub const Parser = struct {
                 else {
                     const value = try p.it.readIntN(u8, 16, 2);
 
-                    var r = try p.createExpr();
+                    var r = try p.arena.allocator.create(Expr);
                     *r = Expr { .Literal = value };
                     return r;
                 }

@@ -56,9 +56,8 @@ pub const Regex = struct {
 
         const expr = try p.parse(re);
 
-        // Program state is tied to the compiler right now.
         var c = Compiler.init(a);
-        errdefer c.deinit();
+        defer c.deinit();
 
         return Regex {
             .allocator = a,
@@ -76,7 +75,7 @@ pub const Regex = struct {
         const expr = p.parse(re) catch unreachable;
 
         var c = Compiler.init(a);
-        errdefer c.deinit();
+        defer c.deinit();
 
         const prog = c.compile(expr) catch unreachable;
 
@@ -90,7 +89,7 @@ pub const Regex = struct {
     }
 
     pub fn deinit(re: &Regex) void {
-        re.compiler.deinit();
+        re.compiled.deinit();
     }
 
     // does the regex match the entire input string? simply run through from the first position.
