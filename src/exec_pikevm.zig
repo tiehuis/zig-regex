@@ -8,6 +8,7 @@
 const std = @import("std");
 const mem = std.mem;
 const Allocator = std.mem.Allocator;
+const ArenaAllocator = std.heap.ArenaAllocator;
 const ArrayList = std.ArrayList;
 
 const parse = @import("parse.zig");
@@ -21,7 +22,39 @@ const Input = @import("input.zig").Input;
 
 const Thread = struct {
     pc: usize,
-    slots: &ArrayList(?usize),
+    // We know the maximum slot entry in advance. Therefore, we allocate the entire array as needed
+    // as this is easier (and probably quicker) than allocating only what we need in an ArrayList.
+    slots: []?usize,
+};
+
+const ExecState = struct {
+    const Self = this;
+
+    arena: ArenaAllocator,
+    slot_count: usize,
+
+    pub fn init(allocator: &Allocator, program: &const Prog) Self {
+        return Self {
+            .arena = ArenaAllocator.init(allocator),
+            .slot_count = program.slot_count
+        };
+    }
+
+    pub fn deinit(self: &Self) void {
+        self.arena.deinit();
+    }
+
+    pub fn newSlot(self: &Self) ![]?usize {
+        var slots = try self.arena.allocator.alloc(?usize, self.slot_count);
+        mem.set(?usize, slots, null);
+        return slots;
+    }
+
+    pub fn cloneSlice(self: &Self, other: []?usize) ![]?usize {
+        var slots = try self.arena.allocator.alloc(?usize, self.slot_count);
+        mem.copy(?usize, slots, other);
+        return slots;
+    }
 };
 
 pub const PikeVm = struct {
@@ -42,10 +75,10 @@ pub const PikeVm = struct {
         var nlist = ArrayList(Thread).init(self.allocator);
         defer nlist.deinit();
 
-        // We can share a single array-list across all threads as we only move forward.
-        slots.shrink(0);
+        var state = ExecState.init(self.allocator, prog);
+        defer state.deinit();
 
-        const t = Thread { .pc = prog_start, .slots = slots };
+        const t = Thread { .pc = prog_start, .slots = try state.newSlot() };
         try clist.append(t);
 
         while (!input.isConsumed()) : (input.advance()) {
@@ -77,7 +110,7 @@ pub const PikeVm = struct {
                     InstData.Match => {
                         // Note: May need to shrink array here.
                         slots.shrink(0);
-                        try slots.appendSlice(thread.slots.toSliceConst());
+                        try slots.appendSlice(thread.slots);
                         return true;
                     },
                     InstData.Save => |slot| {
@@ -85,14 +118,7 @@ pub const PikeVm = struct {
                         // all future captures are valid for any subsequent threads.
                         var new_thread = Thread { .pc = inst.out, .slots = thread.slots };
 
-                        // Our capture array may not be long enough, extend and fill with empty
-                        while (new_thread.slots.len <= slot) {
-                            // TODO: Can't append null as optional
-                            try new_thread.slots.append(0);
-                            new_thread.slots.toSlice()[new_thread.slots.len-1] = null;
-                        }
-
-                        new_thread.slots.toSlice()[slot] = input.byte_pos;
+                        new_thread.slots[slot] = input.byte_pos;
                         try clist.append(new_thread);
                     },
                     InstData.Jump => {
@@ -101,7 +127,7 @@ pub const PikeVm = struct {
                     InstData.Split => |split| {
                         // Split pushed first since we want to handle the branch secondary to the
                         // current thread (popped from end).
-                        try clist.append(Thread { .pc = split, .slots = thread.slots });
+                        try clist.append(Thread { .pc = split, .slots = try state.cloneSlice(thread.slots) });
                         try clist.append(Thread { .pc = inst.out, .slots = thread.slots });
                     },
                 }

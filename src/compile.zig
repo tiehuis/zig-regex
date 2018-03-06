@@ -160,12 +160,15 @@ pub const Prog = struct {
     start: InstPtr,
     // Find Start instruction
     find_start: InstPtr,
+    // Max number of slots required
+    slot_count: usize,
 
-    pub fn init(a: []const Inst, find_start: usize) Prog {
+    pub fn init(a: []const Inst, find_start: usize, slot_count: usize) Prog {
         return Prog {
             .insts = a,
             .start = 0,
             .find_start = find_start,
+            .slot_count = slot_count,
         };
     }
 
@@ -275,7 +278,7 @@ pub const Compiler = struct {
         };
         try p.appendSlice(fragment);
 
-        return Prog.init(p.toOwnedSlice(), fragment_start);
+        return Prog.init(p.toOwnedSlice(), fragment_start, c.capture_index);
     }
 
     fn compileInternal(c: &Compiler, expr: &const Expr) Allocator.Error!Patch {
