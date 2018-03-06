@@ -17,6 +17,28 @@ const PikeVm = @import("exec_pikevm.zig").PikeVm;
 var buffer: [800000]u8 = undefined;
 var fixed_allocator = FixedBufferAllocator.init(buffer[0..]);
 
+fn nullableEql(comptime T: type, a: []const ?T, b: []const ?T) bool {
+    if (a.len != b.len) {
+        return false;
+    }
+
+    var i: usize = 0;
+    while (i < a.len) : (i += 1) {
+        if (a[i] != null and b[i] != null) {
+            if (??a[i] != ??b[i]) {
+                return false;
+            }
+            // ok
+        } else if (a[i] == null and b[i] == null) {
+            // ok
+        } else {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
     var re = Regex.mustCompile(&fixed_allocator.allocator, re_input);
 
@@ -32,32 +54,10 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
     var input2 = InputBytes.init(to_match).input;
     const backtrack_result = backtrack.exec(re.compiled, re.compiled.find_start, &input2, &backtrack_slots) catch unreachable;
 
-    // NOTE: equality on nullables? this is really bad
-    var slots_equal = true;
-    if (backtrack_slots.len != pike_slots.len) {
-        slots_equal = false;
-    } else {
-        for (backtrack_slots.toSliceConst()) |_, i| {
-            if (backtrack_slots.at(i)) |ok1| {
-                if (pike_slots.at(i)) |ok2| {
-                    if (ok1 != ok2) {
-                        continue;
-                    }
-                }
-            } else {
-                if (pike_slots.at(i)) |_x| {
-                } else {
-                    continue;
-                }
-            }
+    const slots_equal = nullableEql(usize, pike_slots.toSliceConst(), backtrack_slots.toSliceConst());
 
-            slots_equal = false;
-            break;
-        }
-    }
-
-    // TODO: pikevm captures are broken
-    if (pike_result != backtrack_result) { // or !slots_equal) {
+    // Note: slot entries are invalid on non-match
+    if (pike_result != backtrack_result) { // or (expected == true and !slots_equal)) {
         debug.warn(
             \\
             \\ -- Failure! ----------------
