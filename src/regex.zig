@@ -41,8 +41,6 @@ const InputBytes = @import("input.zig").InputBytes;
 
 pub const Regex = struct {
     allocator: &Allocator,
-    // Manages the prog state (TODO: Just store allocator in Prog)
-    compiler: Compiler,
     // A compiled set of instructions
     compiled: Prog,
     // Capture slots
@@ -61,7 +59,6 @@ pub const Regex = struct {
 
         return Regex {
             .allocator = a,
-            .compiler = c,
             .compiled = try c.compile(expr),
             .slots = ArrayList(?usize).init(a),
             .string = re,
@@ -81,7 +78,6 @@ pub const Regex = struct {
 
         return Regex {
             .allocator = a,
-            .compiler = c,
             .compiled = prog,
             .slots = ArrayList(?usize).init(a),
             .string = re,
