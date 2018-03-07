@@ -293,10 +293,13 @@ const StringIterator = struct {
 };
 
 pub const ParseError = error {
-    InvalidRepeatOperand,
+    MissingRepeatOperand,
     MissingRepeatArgument,
+    InvalidRepeatArgument,
+    EmptyAlternate,
     UnbalancedParentheses,
     UnopenedParentheses,
+    UnclosedParentheses,
     EmptyCaptureGroup,
     UnmatchedByteClass,
     StackUnderflow,
@@ -377,7 +380,7 @@ pub const Parser = struct {
         if (re1.isByteClass()) {
             return re1;
         } else {
-            return error.MissingRepeatArgument;
+            return error.MissingRepeatOperand;
         }
     }
 
@@ -408,7 +411,9 @@ pub const Parser = struct {
                 '{' => {
                     it.skipSpaces();
 
-                    const min = try it.readInt(usize, 10);
+                    const min = if (it.readInt(usize, 10)) |i| i else |_| {
+                        return error.InvalidRepeatArgument;
+                    };
                     var max: ?usize = min;
 
                     it.skipSpaces();
@@ -423,7 +428,9 @@ pub const Parser = struct {
                         }
                         // {m,n} case with explicit bounds
                         else {
-                            max = try it.readInt(usize, 10);
+                            max = if (it.readInt(usize, 10)) |i| i else |_| {
+                                return error.InvalidRepeatArgument;
+                            };
 
                             if (??max < min) {
                                 return error.InvalidRepeatRange;
@@ -541,7 +548,10 @@ pub const Parser = struct {
 
                     var concat = ArrayList(&Expr).init(p.allocator);
 
-                    // TODO: Handle the empty alternation (||) case?
+                    if (p.stack.len == 0 or !p.stack.at(p.stack.len-1).isByteClass()) {
+                        return error.EmptyAlternate;
+                    }
+
                     while (true) {
                         // would underflow, push a new alternation
                         if (p.stack.len == 0) {
@@ -712,8 +722,12 @@ pub const Parser = struct {
             greedy = false;
         }
 
+        const sub_expr = if (p.popByteClass()) |class| class else |_| {
+            return error.MissingRepeatOperand;
+        };
+
         const repeat = Repeater {
-            .subexpr = try p.popByteClass(),
+            .subexpr = sub_expr,
             .min = min,
             .max = max,
             .greedy = greedy,

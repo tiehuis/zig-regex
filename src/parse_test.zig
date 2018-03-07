@@ -598,52 +598,58 @@ fn checkError(re: []const u8, expected_err: ParseError) void {
 
 test "parse errors repeat" {
     checkError(
+        \\*
+    ,
+        ParseError.MissingRepeatOperand
+    );
+
+    checkError(
         \\(*
     ,
-        ParseError.MissingRepeatArgument
+        ParseError.MissingRepeatOperand
     );
 
     checkError(
         \\({5}
     ,
-        ParseError.MissingRepeatArgument
+        ParseError.MissingRepeatOperand
     );
 
-    //checkError(
-    //    \\{5}
-    //,
-    //    ParseError.MissingRepeatArgument
-    //);
+    checkError(
+        \\{5}
+    ,
+        ParseError.MissingRepeatOperand
+    );
 
     checkError(
         \\a**
     ,
-        ParseError.MissingRepeatArgument
+        ParseError.MissingRepeatOperand
     );
 
     checkError(
         \\a|*
     ,
-        ParseError.MissingRepeatArgument
+        ParseError.MissingRepeatOperand
     );
 
     checkError(
         \\a*{5}
     ,
-        ParseError.MissingRepeatArgument
+        ParseError.MissingRepeatOperand
     );
 
     checkError(
         \\a|{5}
     ,
-        ParseError.MissingRepeatArgument
+        ParseError.MissingRepeatOperand
     );
 
-    //checkError(
-    //    \\a{}
-    //,
-    //    ParseError.MissingRepeatArgument
-    //);
+    checkError(
+        \\a{}
+    ,
+        ParseError.InvalidRepeatArgument
+    );
 
     checkError(
         \\a{5
@@ -651,17 +657,17 @@ test "parse errors repeat" {
         ParseError.UnclosedRepeat
     );
 
-    //checkError(
-    //    \\a{xyz
-    //,
-    //    ParseError.UnclosedRepeat
-    //);
+    checkError(
+        \\a{xyz
+    ,
+        ParseError.InvalidRepeatArgument
+    );
 
-    //checkError(
-    //    \\a{12,xyz
-    //,
-    //    ParseError.UnclosedRepeat
-    //);
+    checkError(
+        \\a{12,xyz
+    ,
+        ParseError.InvalidRepeatArgument
+    );
 
     checkError(
         \\a{999999999999}
@@ -689,23 +695,23 @@ test "parse errors repeat" {
 }
 
 test "parse errors alternate" {
-    //checkError(
-    //    \\|a
-    //,
-    //    ParseError.UnclosedRepeat
-    //);
+    checkError(
+        \\|a
+    ,
+        ParseError.EmptyAlternate
+    );
 
-    //checkError(
-    //    \\(|a)
-    //,
-    //    ParseError.UnclosedRepeat
-    //);
+    checkError(
+        \\(|a)
+    ,
+        ParseError.EmptyAlternate
+    );
 
-    //checkError(
-    //    \\a||
-    //,
-    //    ParseError.UnclosedRepeat
-    //);
+    checkError(
+        \\a||
+    ,
+        ParseError.EmptyAlternate
+    );
 
     checkError(
         \\)
@@ -728,7 +734,7 @@ test "parse errors alternate" {
     //checkError(
     //    \\(a|b
     //,
-    //    ParseError.UnopenedParentheses
+    //    ParseError.UnclosedParentheses
     //);
 
     //checkError(
