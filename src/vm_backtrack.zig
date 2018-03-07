@@ -11,8 +11,8 @@ const Parser = parse.Parser;
 const Expr = parse.Expr;
 const Assertion = parse.Assertion;
 const Compiler = compile.Compiler;
-const Prog = compile.Prog;
-const InstData = compile.InstData;
+const Program = compile.Program;
+const InstructionData = compile.InstructionData;
 const Input = @import("input.zig").Input;
 
 const SaveRestore = struct {
@@ -44,14 +44,14 @@ const ExecState = struct {
     // cache (we can bound this visited bitset since we bound when we use the backtracking engine.
     visited: [BitsetLen]BitsetType,
 
-    prog: &const Prog,
+    prog: &const Program,
 
     slots: &ArrayList(?usize),
 };
 
 // This is bounded and only used for small compiled regexes. It is not quadratic since pre-seen
 // nodes are cached across threads.
-pub const BacktrackVm = struct {
+pub const VmBacktrack = struct {
     const Self = this;
     allocator: &Allocator,
 
@@ -61,11 +61,11 @@ pub const BacktrackVm = struct {
         };
     }
 
-    fn shouldExec(prog: &const Prog, input: &const Input) bool {
+    fn shouldExec(prog: &const Program, input: &const Input) bool {
         return (prog.insts.len + 1) * (input.bytes.len + 1) < ExecState.BitsetLen * @sizeOf(ExecState.BitsetType);
     }
 
-    pub fn exec(self: &Self, prog: &const Prog, prog_start: usize, input: &Input, slots: &ArrayList(?usize)) !bool {
+    pub fn exec(self: &Self, prog: &const Program, prog_start: usize, input: &Input, slots: &ArrayList(?usize)) !bool {
         // Should never run this without first checking shouldExec and running only if true.
         debug.assert(shouldExec(prog, input));
 
@@ -116,30 +116,30 @@ pub const BacktrackVm = struct {
             }
 
             switch (inst.data) {
-                InstData.Char => |ch| {
+                InstructionData.Char => |ch| {
                     if (at == null or ??at != ch) {
                         return false;
                     }
                     input.advance();
                 },
-                InstData.EmptyMatch => |assertion| {
+                InstructionData.EmptyMatch => |assertion| {
                     if (!input.isEmptyMatch(assertion)) {
                         return false;
                     }
                 },
-                InstData.ByteClass => |class| {
+                InstructionData.ByteClass => |class| {
                     if (at == null or !class.contains(??at)) {
                         return false;
                     }
                     input.advance();
                 },
-                InstData.AnyCharNotNL => {
+                InstructionData.AnyCharNotNL => {
                     if (at == null or ??at == '\n') {
                         return false;
                     }
                     input.advance();
                 },
-                InstData.Save => |slot| {
+                InstructionData.Save => |slot| {
                     // Our capture array may not be long enough, extend and fill with empty
                     while (state.slots.len <= slot) {
                         // TODO: Can't append null as optional
@@ -160,13 +160,13 @@ pub const BacktrackVm = struct {
 
                     state.slots.toSlice()[slot] = input.byte_pos;
                 },
-                InstData.Match => {
+                InstructionData.Match => {
                     return true;
                 },
-                InstData.Jump => {
+                InstructionData.Jump => {
                     // Jump at end of loop
                 },
-                InstData.Split => |split| {
+                InstructionData.Split => |split| {
                     const t = Job { .Thread = Thread { .ip = split, .input = input.clone() }};
                     try state.jobs.append(t);
                 }

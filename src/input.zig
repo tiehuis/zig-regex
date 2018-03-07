@@ -1,3 +1,12 @@
+// A generic iterator of some input bytes.
+//
+// This is intended to handle different decoding patterns. The intent is to have a Utf-8 and byte
+// input abstraction. Execution engines can be generic over these two types.
+//
+// Technically we could encode Utf-8 into associated bytes when constructing the program. This is
+// typically slower on the match however as for large unicode states many more states need to be
+// traversed.
+
 const Assertion = @import("parse.zig").Assertion;
 
 pub const Input = struct {

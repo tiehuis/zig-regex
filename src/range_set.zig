@@ -1,3 +1,8 @@
+// A set of ordered disconnected non-empty ranges. These are stored in a flat array as opposed
+// to a tree structure. Insertions maintain order by rearranging as needed. Asymptotically this is
+// worse than a tree range-set but given the size of the typical range-sets we work with this
+// implementation is undoubtedly quicker.
+
 const std = @import("std");
 const debug = std.debug;
 const mem = std.mem;
@@ -12,12 +17,8 @@ pub fn Range(comptime T: type) type {
         max: T,
 
         pub fn new(min: T, max: T) Range(T) {
-            // It doesn't matter if the order is inverted as we only check for containment.
-            if (min <= max) {
-                return Range(T) { .min = min, .max = max };
-            } else {
-                return Range(T) { .min = max, .max = min };
-            }
+            debug.assert(min <= max);
+            return Range(T) { .min = min, .max = max };
         }
 
         pub fn single(item: T) Range(T) {
@@ -133,7 +134,7 @@ pub fn RangeSet(comptime T: type) type {
         }
 
         pub fn contains(self: &const Self, value: T) bool {
-            // TODO: Binary search may be useful if many sets since always ordered.
+            // TODO: Binary search required for large unicode sets.
             for (self.ranges.toSliceConst()) |range| {
                 if (range.min <= value and value <= range.max) {
                     return true;
@@ -162,7 +163,7 @@ pub const ByteClassTemplates = struct {
         // \t, \n, \v, \f, \r
         try rs.addRange(ByteRange.new('\x09', '\x0D'));
         // ' '
-        try rs.addRange(ByteRange.new(' ', ' '));
+        try rs.addRange(ByteRange.single(' '));
 
         return rs;
     }

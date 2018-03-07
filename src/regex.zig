@@ -1,26 +1,7 @@
-// Supported constructs:
+// External high-level Regex api.
 //
-// [x] .
-// [x] [xyz]
-// [ ] [^xyz]
-// [x] \d
-// [x] \D
-// [ ] [[:alpha:]]
-// [ ] [[:^alpha:]]
-// [ ] unicode
-// [x] (axyz)
-// [x] xy
-// [x] x|y
-// [x] x* (?)
-// [x] x+ (?)
-// [x] x? (?)
-// [x] x{n,m} (?)
-// [x] x{n,} (?)
-// [x] ^
-// [x] $
-// [x] \A
-// [x] \b
-// [x] escape sequences
+// This hides details such as what matching engine is used internally and the parsing/compilation
+// stages are merged into a single wrapper function.
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
@@ -34,20 +15,22 @@ const exec = @import("exec.zig");
 const Parser = parse.Parser;
 const Expr = parse.Expr;
 const Compiler = compile.Compiler;
-const Prog = compile.Prog;
-const Inst = compile.Inst;
+const Program = compile.Program;
+const Instruction = compile.Instruction;
 
 const InputBytes = @import("input.zig").InputBytes;
 
 pub const Regex = struct {
+    // Internal allocator
     allocator: &Allocator,
     // A compiled set of instructions
-    compiled: Prog,
+    compiled: Program,
     // Capture slots
     slots: ArrayList(?usize),
     // Original regex string
     string: []const u8,
 
+    // Compile a regex, possibly returning any error which occurred.
     pub fn compile(a: &Allocator, re: []const u8) !Regex {
         var p = Parser.init(a);
         defer p.deinit();
@@ -65,6 +48,7 @@ pub const Regex = struct {
         };
     }
 
+    // Compile a regex, panicking if it could not be allocated or is invalid.
     pub fn mustCompile(a: &Allocator, re: []const u8) Regex {
         var p = Parser.init(a);
         defer p.deinit();
@@ -88,22 +72,21 @@ pub const Regex = struct {
         re.compiled.deinit();
     }
 
-    // does the regex match the entire input string? simply run through from the first position.
+    // Does the regex match at the start of the string?
     pub fn match(re: &Regex, input_str: []const u8) !bool {
         var input_bytes = InputBytes.init(input_str);
         return exec.exec(re.allocator, re.compiled, re.compiled.start, &input_bytes.input, &re.slots);
     }
 
-    // does the regexp match any region within the string? memchr to the first byte in the regex
-    // (if possible) and then run the matcher from there. this is important.
+    // Does the regex match anywhere in the string?
     pub fn partialMatch(re: &Regex, input_str: []const u8) !bool {
         var input_bytes = InputBytes.init(input_str);
         return exec.exec(re.allocator, re.compiled, re.compiled.find_start, &input_bytes.input, &re.slots);
     }
 
-    // where does the string match in the regex?
+    // Where in the string does the regex and its capture groups match?
     //
-    // the 0 capture is the entire match.
+    // Zero capture is the entire match.
     pub fn captures(re: &Regex, input_str: []const u8) !?Captures {
         var input_bytes = InputBytes.init(input_str);
         const is_match = try exec.exec(re.allocator, re.compiled, re.compiled.find_start, &input_bytes.input, &re.slots);
@@ -116,6 +99,7 @@ pub const Regex = struct {
     }
 };
 
+// A pair of bounds used to index into an associated slice.
 pub const Span = struct {
     lower: usize,
     upper: usize,
@@ -129,7 +113,6 @@ pub const Captures = struct {
     allocator: &Allocator,
     slots: []const ?usize,
 
-    // Move the slots out of the array list into this capture group.
     pub fn init(input: []const u8, slots: &ArrayList(?usize)) Captures {
         return Captures {
             .input = input,
@@ -142,7 +125,7 @@ pub const Captures = struct {
         self.allocator.free(self.slots);
     }
 
-    pub fn len(self: &const Self) void {
+    pub fn len(self: &const Self) usize {
         return self.slots.len / 2;
     }
 

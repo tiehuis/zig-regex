@@ -16,8 +16,8 @@ const compile = @import("compile.zig");
 
 const Parser = parse.Parser;
 const Assertion = parse.Assertion;
-const Prog = compile.Prog;
-const InstData = compile.InstData;
+const Program = compile.Program;
+const InstructionData = compile.InstructionData;
 const Input = @import("input.zig").Input;
 
 const Thread = struct {
@@ -33,7 +33,7 @@ const ExecState = struct {
     arena: ArenaAllocator,
     slot_count: usize,
 
-    pub fn init(allocator: &Allocator, program: &const Prog) Self {
+    pub fn init(allocator: &Allocator, program: &const Program) Self {
         return Self {
             .arena = ArenaAllocator.init(allocator),
             .slot_count = program.slot_count
@@ -57,7 +57,7 @@ const ExecState = struct {
     }
 };
 
-pub const PikeVm = struct {
+pub const VmPike = struct {
     const Self = this;
 
     allocator: &Allocator,
@@ -68,7 +68,7 @@ pub const PikeVm = struct {
         };
     }
 
-    pub fn exec(self: &Self, prog: &const Prog, prog_start: usize, input: &Input, slots: &ArrayList(?usize)) !bool {
+    pub fn exec(self: &Self, prog: &const Program, prog_start: usize, input: &Input, slots: &ArrayList(?usize)) !bool {
         var clist = ArrayList(Thread).init(self.allocator);
         defer clist.deinit();
 
@@ -87,33 +87,33 @@ pub const PikeVm = struct {
                 const at = input.current();
 
                 switch (inst.data) {
-                    InstData.Char => |ch| {
+                    InstructionData.Char => |ch| {
                         if (at != null and ??at == ch) {
                             try nlist.append(Thread { .pc = inst.out, .slots = thread.slots });
                         }
                     },
-                    InstData.EmptyMatch => |assertion| {
+                    InstructionData.EmptyMatch => |assertion| {
                         if (input.isEmptyMatch(assertion)) {
                             try clist.append(Thread { .pc = inst.out, .slots = thread.slots });
                         }
                     },
-                    InstData.ByteClass => |class| {
+                    InstructionData.ByteClass => |class| {
                         if (at != null and class.contains(??at)) {
                             try nlist.append(Thread { .pc = inst.out, .slots = thread.slots });
                         }
                     },
-                    InstData.AnyCharNotNL => {
+                    InstructionData.AnyCharNotNL => {
                         if (at != null and ??at != '\n') {
                             try nlist.append(Thread { .pc = inst.out, .slots = thread.slots });
                         }
                     },
-                    InstData.Match => {
+                    InstructionData.Match => {
                         // Note: May need to shrink array here.
                         slots.shrink(0);
                         try slots.appendSlice(thread.slots);
                         return true;
                     },
-                    InstData.Save => |slot| {
+                    InstructionData.Save => |slot| {
                         // We don't need a deep copy here since we only ever advance forward so
                         // all future captures are valid for any subsequent threads.
                         var new_thread = Thread { .pc = inst.out, .slots = thread.slots };
@@ -121,10 +121,10 @@ pub const PikeVm = struct {
                         new_thread.slots[slot] = input.byte_pos;
                         try clist.append(new_thread);
                     },
-                    InstData.Jump => {
+                    InstructionData.Jump => {
                         try clist.append(Thread { .pc = inst.out, .slots = thread.slots });
                     },
-                    InstData.Split => |split| {
+                    InstructionData.Split => |split| {
                         // Split pushed first since we want to handle the branch secondary to the
                         // current thread (popped from end).
                         try clist.append(Thread { .pc = split, .slots = try state.cloneSlice(thread.slots) });

@@ -10,8 +10,8 @@ const FixedBufferAllocator = std.heap.FixedBufferAllocator;
 const mem = std.mem;
 
 // vms to test
-const BacktrackVm = @import("exec_backtrack.zig").BacktrackVm;
-const PikeVm = @import("exec_pikevm.zig").PikeVm;
+const VmBacktrack = @import("vm_backtrack.zig").VmBacktrack;
+const VmPike = @import("vm_pike.zig").VmPike;
 
 // Debug global allocator is too small for our tests
 var buffer: [800000]u8 = undefined;
@@ -43,9 +43,9 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
     var re = Regex.mustCompile(&fixed_allocator.allocator, re_input);
 
     // This is just an engine comparison test but we should also test against fixed vectors
-    var backtrack = BacktrackVm.init(re.allocator);
+    var backtrack = VmBacktrack.init(re.allocator);
     var backtrack_slots = ArrayList(?usize).init(re.allocator);
-    var pike = PikeVm.init(re.allocator);
+    var pike = VmPike.init(re.allocator);
     var pike_slots = ArrayList(?usize).init(re.allocator);
 
     var input1 = InputBytes.init(to_match).input;

@@ -1,3 +1,6 @@
+/// Parses a regular expression into an expression-tree. Uses a stack-based parser to avoid
+/// unbounded recursion.
+
 const std = @import("std");
 const mem = std.mem;
 const fmt = std.fmt;
@@ -12,22 +15,22 @@ const ByteClassTemplates = range_set.ByteClassTemplates;
 /// A single class range (e.g. [a-z]).
 pub const ByteRange = range_set.Range(u8);
 
-/// A number of class ranges (e.g. [a-z0-9])
+/// Multiple class ranges (e.g. [a-z0-9])
 pub const ByteClass = range_set.RangeSet(u8);
 
-/// Repeat sequence (i.e. +, *, ?, {m,n})
+/// Repeat sequence (e.g. +, *, ?, {m,n})
 pub const Repeater = struct {
     // The sub-expression to repeat
     subexpr: &Expr,
     // Lower number of times to match
     min: usize,
-    // Upper number of times to match (null => infinite)
+    // Upper number of times to match (null -> infinite)
     max: ?usize,
-    // Whether we match greedily
+    // Whether this matches greedily
     greedy: bool,
 };
 
-/// A specific assertion type.
+/// A specific look-around assertion
 pub const Assertion = enum {
     // Always true assertion
     None,
@@ -45,7 +48,7 @@ pub const Assertion = enum {
     NotWordBoundaryAscii,
 };
 
-/// Represents a single node in an AST.
+/// A single node of an expression tree.
 pub const Expr = union(enum) {
     // Empty match (\w assertion)
     EmptyMatch: Assertion,
@@ -306,7 +309,18 @@ pub const ParseError = error {
     UnrecognizedEscapeCode,
 };
 
-const repeat_max_length = 1000;
+pub const ParserOptions = struct {
+    // Upper limit on values allowed in a bounded expression (e.g. {500,1000}).
+    // This must be bounded as these are unrolled by the engine into individual branches and
+    // otherwise are a vector for memory exhaustion attacks.
+    max_repeat_length: usize,
+
+    pub fn default() ParserOptions {
+        return ParserOptions {
+            .max_repeat_length = 1000,
+        };
+    }
+};
 
 /// Parser manages the parsing state and converts a regular expression string into an expression tree.
 ///
@@ -318,15 +332,21 @@ pub const Parser = struct {
     arena: ArenaAllocator,
     // Allocator for temporary lists/items
     allocator: &Allocator,
-
-    // Internal parse state.
+    // Configurable parser options
+    options: ParserOptions,
+    // Internal execution state.
     it: StringIterator,
 
     pub fn init(a: &Allocator) Parser {
+        return initWithOptions(a, ParserOptions.default());
+    }
+
+    pub fn initWithOptions(a: &Allocator, options: &const ParserOptions) Parser {
         return Parser {
             .stack = ArrayList(&Expr).init(a),
             .arena = ArenaAllocator.init(a),
             .allocator = a,
+            .options = *options,
             .it = undefined,
         };
     }
@@ -418,7 +438,8 @@ pub const Parser = struct {
                     it.bump();
 
                     // We limit repeat counts to overoad arbitrary memory blowup during compilation
-                    if (min > repeat_max_length or max != null and ??max > repeat_max_length) {
+                    const limit = p.options.max_repeat_length;
+                    if (min > limit or max != null and ??max > limit) {
                         return error.ExcessiveRepeatCount;
                     }
 
