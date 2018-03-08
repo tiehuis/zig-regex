@@ -309,6 +309,8 @@ pub const ParseError = error {
     ExcessiveRepeatCount,
     OpenEscapeCode,
     UnclosedHexCharacterCode,
+    InvalidHexDigit,
+    InvalidOctalDigit,
     UnrecognizedEscapeCode,
 };
 
@@ -411,9 +413,7 @@ pub const Parser = struct {
                 '{' => {
                     it.skipSpaces();
 
-                    const min = if (it.readInt(usize, 10)) |i| i else |_| {
-                        return error.InvalidRepeatArgument;
-                    };
+                    const min = it.readInt(usize, 10) catch return error.InvalidRepeatArgument;
                     var max: ?usize = min;
 
                     it.skipSpaces();
@@ -428,9 +428,7 @@ pub const Parser = struct {
                         }
                         // {m,n} case with explicit bounds
                         else {
-                            max = if (it.readInt(usize, 10)) |i| i else |_| {
-                                return error.InvalidRepeatArgument;
-                            };
+                            max = it.readInt(usize, 10) catch return error.InvalidRepeatArgument;
 
                             if (??max < min) {
                                 return error.InvalidRepeatRange;
@@ -722,9 +720,7 @@ pub const Parser = struct {
             greedy = false;
         }
 
-        const sub_expr = if (p.popByteClass()) |class| class else |_| {
-            return error.MissingRepeatOperand;
-        };
+        const sub_expr = p.popByteClass() catch return error.MissingRepeatOperand;
 
         const repeat = Repeater {
             .subexpr = sub_expr,
@@ -822,12 +818,7 @@ pub const Parser = struct {
     }
 
     fn parseEscape(p: &Parser) !&Expr {
-        var ch: u8 = undefined;
-        if (p.it.next()) |ok| {
-            ch = ok;
-        } else {
-            return error.OpenEscapeCode;
-        }
+        const ch = p.it.next() ?? return error.OpenEscapeCode;
 
         if (isPunctuation(ch)) {
             var r = try p.arena.allocator.create(Expr);
@@ -915,7 +906,7 @@ pub const Parser = struct {
 
                 // octal integer up to 3 digits, always succeeds since we have at least one digit
                 // TODO: u32 codepoint and not u8
-                const value = p.it.readIntN(u8, 8, 3) catch unreachable;
+                const value = p.it.readIntN(u8, 8, 3) catch return error.InvalidOctalDigit;
 
                 var r = try p.arena.allocator.create(Expr);
                 *r = Expr { .Literal = value };
@@ -929,7 +920,7 @@ pub const Parser = struct {
                     p.it.bump();
 
                     // TODO: u32 codepoint and not u8
-                    const value = try p.it.readInt(u8, 16);
+                    const value = p.it.readInt(u8, 16) catch return error.InvalidHexDigit;
 
                     // TODO: Check range as well and if valid unicode codepoint
                     if (!p.it.peekIs('}')) {
@@ -943,7 +934,7 @@ pub const Parser = struct {
                 }
                 // '\x23
                 else {
-                    const value = try p.it.readIntN(u8, 16, 2);
+                    const value = p.it.readIntN(u8, 16, 2) catch return error.InvalidHexDigit;
 
                     var r = try p.arena.allocator.create(Expr);
                     *r = Expr { .Literal = value };

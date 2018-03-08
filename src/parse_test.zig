@@ -781,11 +781,11 @@ test "parse errors escape" {
         ParseError.UnrecognizedEscapeCode
     );
 
-    //checkError(
-    //    "\\x"
-    //,
-    //    ParseError.UnrecognizedEscapeCode
-    //);
+    checkError(
+        "\\x"
+    ,
+        ParseError.InvalidHexDigit
+    );
 
     //checkError(
     //    "\\xA"
@@ -799,41 +799,41 @@ test "parse errors escape" {
     //    ParseError.UnrecognizedEscapeCode
     //);
 
-    //checkError(
-    //    "\\x{"
-    //,
-    //    ParseError.UnrecognizedEscapeCode
-    //);
+    checkError(
+        "\\x{"
+    ,
+        ParseError.InvalidHexDigit
+    );
 
-    //checkError(
-    //    "\\x{A"
-    //,
-    //    ParseError.UnrecognizedEscapeCode
-    //);
+    checkError(
+        "\\x{A"
+    ,
+        ParseError.UnclosedHexCharacterCode
+    );
 
-    //checkError(
-    //    "\\x{AG}"
-    //,
-    //    ParseError.UnrecognizedEscapeCode
-    //);
+    checkError(
+        "\\x{AG}"
+    ,
+        ParseError.UnclosedHexCharacterCode
+    );
 
-    //checkError(
-    //    "\\x{D800}"
-    //,
-    //    ParseError.UnrecognizedEscapeCode
-    //);
+    checkError(
+        "\\x{D800}"
+    ,
+        ParseError.InvalidHexDigit
+    );
 
-    //checkError(
-    //    "\\x{110000}"
-    //,
-    //    ParseError.UnrecognizedEscapeCode
-    //);
+    checkError(
+        "\\x{110000}"
+    ,
+        ParseError.InvalidHexDigit
+    );
 
-    //checkError(
-    //    "\\x{99999999999999}"
-    //,
-    //    ParseError.UnrecognizedEscapeCode
-    //);
+    checkError(
+        "\\x{99999999999999}"
+    ,
+        ParseError.InvalidHexDigit
+    );
 }
 
 test "parse errors character class" {
