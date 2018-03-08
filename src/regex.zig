@@ -48,26 +48,6 @@ pub const Regex = struct {
         };
     }
 
-    // Compile a regex, panicking if it could not be allocated or is invalid.
-    pub fn mustCompile(a: &Allocator, re: []const u8) Regex {
-        var p = Parser.init(a);
-        defer p.deinit();
-
-        const expr = p.parse(re) catch unreachable;
-
-        var c = Compiler.init(a);
-        defer c.deinit();
-
-        const prog = c.compile(expr) catch unreachable;
-
-        return Regex {
-            .allocator = a,
-            .compiled = prog,
-            .slots = ArrayList(?usize).init(a),
-            .string = re,
-        };
-    }
-
     pub fn deinit(re: &Regex) void {
         re.compiled.deinit();
     }

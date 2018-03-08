@@ -10,7 +10,7 @@ var buffer: [800000]u8 = undefined;
 var fixed_allocator = FixedBufferAllocator.init(buffer[0..]);
 
 fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
-    var re = Regex.mustCompile(&fixed_allocator.allocator, re_input);
+    var re = Regex.compile(&fixed_allocator.allocator, re_input) catch unreachable;
 
     if ((re.partialMatch(to_match) catch unreachable) != expected) {
         debug.warn(
@@ -116,7 +116,7 @@ test "regex sanity tests" {
 }
 
 test "regex captures" {
-    var r = Regex.mustCompile(debug.global_allocator, "ab(\\d+)");
+    var r = Regex.compile(debug.global_allocator, "ab(\\d+)") catch unreachable;
 
     debug.assert(try r.partialMatch("xxxxab0123a"));
 

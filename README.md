@@ -34,14 +34,6 @@ Compiles a regex string, returning any errors during parsing/compiling.
 ---
 
 ```
-pub fn mustCompile(a: &Allocator, re: []const u8) Regex
-```
-
-Same as `compile`, but panics on any error.
-
----
-
-```
 pub fn match(re: &const Regex, input: []const u8) !bool
 ```
 
