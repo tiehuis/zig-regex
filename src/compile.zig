@@ -176,7 +176,7 @@ pub const Program = struct {
     }
 
     pub fn deinit(p: &Program) void {
-        self.allocator.free(insts);
+        p.allocator.free(p.insts);
     }
 
     pub fn dump(s: &const Program) void {
