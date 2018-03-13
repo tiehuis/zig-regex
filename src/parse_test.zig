@@ -731,11 +731,11 @@ test "parse errors alternate" {
         ParseError.UnopenedParentheses
     );
 
-    //checkError(
-    //    \\(a|b
-    //,
-    //    ParseError.UnclosedParentheses
-    //);
+    checkError(
+        \\(a|b
+    ,
+        ParseError.UnclosedParentheses
+    );
 
     //checkError(
     //    \\(a|)
@@ -752,7 +752,7 @@ test "parse errors alternate" {
     checkError(
         \\ab(xy
     ,
-        ParseError.UnbalancedParentheses
+        ParseError.UnclosedParentheses
     );
 
     //checkError(
@@ -861,17 +861,17 @@ test "parse errors character class" {
         ParseError.UnclosedBrackets
     );
 
-    //checkError(
-    //    \\[a-
-    //,
-    //    ParseError.UnclosedBrackets
-    //);
+    checkError(
+        \\[a-
+    ,
+        ParseError.UnclosedBrackets
+    );
 
-    //checkError(
-    //    \\[^a-
-    //,
-    //    ParseError.UnclosedBrackets
-    //);
+    checkError(
+        \\[^a-
+    ,
+        ParseError.UnclosedBrackets
+    );
 
     checkError(
         \\[---
@@ -923,12 +923,6 @@ test "parse errors character class" {
 
     //checkError(
     //    \\[^\d\D]
-    //,
-    //    ParseError.UnclosedBrackets
-    //);
-
-    //checkError(
-    //    \\[~~]
     //,
     //    ParseError.UnclosedBrackets
     //);

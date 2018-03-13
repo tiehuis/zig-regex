@@ -517,7 +517,9 @@ pub const Parser = struct {
                                 mem.reverse(&Expr, concat.toSlice());
                                 *ra = Expr { .Concat = concat };
 
-                                if (concat.len == 1) {
+                                if (concat.len == 0) {
+                                    return error.EmptyCaptureGroup;
+                                } else if (concat.len == 1) {
                                     *ra = *concat.toSliceConst()[0];
                                 } else {
                                     *ra = Expr { .Concat = concat };
@@ -681,7 +683,7 @@ pub const Parser = struct {
             const e = p.stack.pop();
             switch (*e) {
                 Expr.PseudoLeftParen => {
-                    return error.UnbalancedParentheses;
+                    return error.UnclosedParentheses;
                 },
                 // Alternation at top-level, push concat and return
                 Expr.Alternate => {
@@ -696,6 +698,14 @@ pub const Parser = struct {
 
                     // use the expression itself
                     try e.Alternate.append(ra);
+
+                    // if stack is not empty, this is an error
+                    if (p.stack.len != 0) {
+                        switch (*p.stack.pop()) {
+                            Expr.PseudoLeftParen => return error.UnclosedParentheses,
+                            else => unreachable,
+                        }
+                    }
 
                     return e;
                 },
@@ -796,7 +806,9 @@ pub const Parser = struct {
                 it.bump();
                 it.bump();
 
-                if (it.peekIs(']')) {
+                if (it.peek() == null) {
+                    return error.UnclosedBrackets;
+                } else if (it.peekIs(']')) {
                     // treat the '-' as a literal instead
                     it.index -= 1;
                 } else {
