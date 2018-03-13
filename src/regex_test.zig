@@ -100,7 +100,6 @@ test "regex sanity tests" {
     check("b[k-z]*", "ab", true);
     check("[0-9]", "  - ", false);
     check("[^0-9]", "  - ", true);
-    //check("0|", "0|", true);
     check("[Hh]ello [Ww]orld\\s*[!]?", "Hello world !", true);
     check("[Hh]ello [Ww]orld\\s*[!]?", "hello world !", true);
     check("[Hh]ello [Ww]orld\\s*[!]?", "Hello World !", true);

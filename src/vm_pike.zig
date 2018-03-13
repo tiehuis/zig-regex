@@ -50,7 +50,7 @@ const ExecState = struct {
         return slots;
     }
 
-    pub fn cloneSlice(self: &Self, other: []?usize) ![]?usize {
+    pub fn cloneSlots(self: &Self, other: []?usize) ![]?usize {
         var slots = try self.arena.allocator.alloc(?usize, self.slot_count);
         mem.copy(?usize, slots, other);
         return slots;
@@ -81,6 +81,8 @@ pub const VmPike = struct {
         const t = Thread { .pc = prog_start, .slots = try state.newSlot() };
         try clist.append(t);
 
+        var matched: ?[]?usize = null;
+
         while (!input.isConsumed()) : (input.advance()) {
             while (clist.popOrNull()) |thread| {
                 const inst = prog.insts[thread.pc];
@@ -108,10 +110,23 @@ pub const VmPike = struct {
                         }
                     },
                     InstructionData.Match => {
-                        // Note: May need to shrink array here.
-                        slots.shrink(0);
-                        try slots.appendSlice(thread.slots);
-                        return true;
+                        // We always will have a complete capture in the 0, 1 index
+                        if (matched) |last| {
+                            // leftmost
+                            if (??thread.slots[0] > ??last[0]) {
+                                continue;
+                            }
+                            // longest
+                            if (??thread.slots[1] - ??thread.slots[0] <= ??last[1] - ??last[0]) {
+                                continue;
+                            }
+                        }
+
+                        matched = try state.cloneSlots(thread.slots);
+
+                        // TODO: Handle thread priority correctly so we can immediately finish all
+                        // current threads in clits.
+                        // clist.shrink(0);
                     },
                     InstructionData.Save => |slot| {
                         // We don't need a deep copy here since we only ever advance forward so
@@ -127,7 +142,7 @@ pub const VmPike = struct {
                     InstructionData.Split => |split| {
                         // Split pushed first since we want to handle the branch secondary to the
                         // current thread (popped from end).
-                        try clist.append(Thread { .pc = split, .slots = try state.cloneSlice(thread.slots) });
+                        try clist.append(Thread { .pc = split, .slots = try state.cloneSlots(thread.slots) });
                         try clist.append(Thread { .pc = inst.out, .slots = thread.slots });
                     },
                 }
@@ -135,6 +150,12 @@ pub const VmPike = struct {
 
             mem.swap(ArrayList(Thread), &clist, &nlist);
             nlist.shrink(0);
+        }
+
+        if (matched) |ok_matched| {
+            slots.shrink(0);
+            try slots.appendSlice(ok_matched);
+            return true;
         }
 
         return false;
