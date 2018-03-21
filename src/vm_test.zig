@@ -3,6 +3,7 @@ const debug = @import("std").debug;
 const Parser = @import("parse.zig").Parser;
 const Regex = @import("regex.zig").Regex;
 const InputBytes = @import("input.zig").InputBytes;
+const re_debug = @import("debug.zig");
 
 const std = @import("std");
 const ArrayList = std.ArrayList;
@@ -118,14 +119,14 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
             \\ -- Expression Tree ------------
             \\
         );
-        expr.dump();
+        re_debug.dumpExpr(expr);
 
         debug.warn(
             \\
             \\ -- Bytecode -------------------
             \\
         );
-        re.compiled.dump();
+        re_debug.dumpProgram(re.compiled);
 
         debug.warn(
             \\

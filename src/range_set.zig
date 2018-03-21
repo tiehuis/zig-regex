@@ -142,13 +142,6 @@ pub fn RangeSet(comptime T: type) type {
             }
             return false;
         }
-
-        fn dump(self: &const Self) void {
-            for (self.ranges.toSliceConst()) |r| {
-                debug.warn("({} {}) ", r.min, r.max);
-            }
-            debug.warn("\n");
-        }
     };
 }
 

@@ -1,6 +1,7 @@
 const Regex = @import("regex.zig").Regex;
 const debug = @import("std").debug;
 const Parser = @import("parse.zig").Parser;
+const re_debug = @import("debug.zig");
 
 const FixedBufferAllocator = @import("std").heap.FixedBufferAllocator;
 const mem = @import("std").mem;
@@ -37,14 +38,14 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
             \\ -- Expression Tree ------------
             \\
         );
-        expr.dump();
+        re_debug.dumpExpr(expr);
 
         debug.warn(
             \\
             \\ -- Bytecode -------------------
             \\
         );
-        re.compiled.dump();
+        re_debug.dumpProgram(re.compiled);
 
         debug.warn(
             \\

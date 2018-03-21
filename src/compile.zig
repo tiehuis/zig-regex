@@ -42,38 +42,6 @@ pub const Instruction = struct {
             .data = *data,
         };
     }
-
-    pub fn dump(s: &const Instruction) void {
-        switch (s.data) {
-            InstructionData.Char => |ch| {
-                debug.warn("char({}) '{c}'\n", s.out, ch);
-            },
-            InstructionData.EmptyMatch => |assertion| {
-                debug.warn("empty({}) {}\n", s.out, @tagName(assertion));
-            },
-            InstructionData.ByteClass => |class| {
-                debug.warn("range({}) ", s.out);
-                for (class.ranges.toSliceConst()) |r|
-                    debug.warn("[{}-{}]", r.min, r.max);
-                debug.warn("\n");
-            },
-            InstructionData.AnyCharNotNL => {
-                debug.warn("any({})\n", s.out);
-            },
-            InstructionData.Match => {
-                debug.warn("match\n");
-            },
-            InstructionData.Jump => {
-                debug.warn("jump({})\n", s.out);
-            },
-            InstructionData.Split => |branch| {
-                debug.warn("split({}) {}\n", s.out, branch);
-            },
-            InstructionData.Save => |slot| {
-                debug.warn("save({}), {}\n", s.out, slot);
-            },
-        }
-    }
 };
 
 // Represents an instruction with unpatched holes.
@@ -178,14 +146,6 @@ pub const Program = struct {
     pub fn deinit(p: &Program) void {
         p.allocator.free(p.insts);
     }
-
-    pub fn dump(s: &const Program) void {
-        debug.warn("start: {}\n\n", s.start);
-        for (s.insts) |inst, i| {
-            debug.warn("L{}: ", i);
-            inst.dump();
-        }
-    }
 };
 
 // A Hole represents the outgoing node of a partially compiled Fragment.
@@ -259,7 +219,6 @@ pub const Compiler = struct {
                     try p.append(x);
                 },
                 else => |inner| {
-                    debug.warn("Uncompiled instruction: {}", @tagName(inner));
                     @panic("uncompiled instruction encountered during compilation");
                 }
             }
