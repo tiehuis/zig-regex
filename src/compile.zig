@@ -39,7 +39,7 @@ pub const Instruction = struct {
     pub fn new(out: usize, data: &const InstructionData) Instruction {
         return Instruction {
             .out = out,
-            .data = *data,
+            .data = data.*,
         };
     }
 };
@@ -75,7 +75,7 @@ const PartialInst = union(enum) {
 
     // Modify the current instruction to point to the specified instruction.
     pub fn fill(s: &PartialInst, i: usize) void {
-        switch (*s) {
+        switch (s.*) {
             PartialInst.Uncompiled => |ih| {
                 var comp: Instruction = undefined;
 
@@ -111,7 +111,7 @@ const PartialInst = union(enum) {
                         Instruction.new(i, InstructionData { .Save = slot }),
                 };
 
-                *s = PartialInst { .Compiled = compiled };
+                s.* = PartialInst { .Compiled = compiled };
             },
             PartialInst.Compiled => {
                 // nothing to do, already filled
@@ -245,7 +245,7 @@ pub const Compiler = struct {
     }
 
     fn compileInternal(c: &Compiler, expr: &const Expr) Allocator.Error!Patch {
-        switch (*expr) {
+        switch (expr.*) {
             Expr.Literal => |lit| {
                 const h = try c.pushHole(InstHole { .Char = lit });
                 return Patch { .hole = h, .entry = c.insts.len - 1 };
@@ -384,7 +384,7 @@ pub const Compiler = struct {
                 // TODO: Why does this need to be dynamically allocated?
                 var last_hole = try c.allocator.create(Hole);
                 defer c.allocator.destroy(last_hole);
-                *last_hole = Hole.None;
+                last_hole.* = Hole.None;
 
                 // This compiles one branch of the split at a time.
                 for (subexprs.toSliceConst()[0..subexprs.len-1]) |subexpr| {
@@ -393,7 +393,7 @@ pub const Compiler = struct {
                     // next entry will be a sub-expression
                     //
                     // We fill the second part of this hole on the next sub-expression.
-                    *last_hole = try c.pushHole(InstHole { .Split1 = c.insts.len + 1 });
+                    last_hole.* = try c.pushHole(InstHole { .Split1 = c.insts.len + 1 });
 
                     // compile the subexpression
                     const p = try c.compileInternal(subexpr);
@@ -512,19 +512,19 @@ pub const Compiler = struct {
 
     // Push a compiled instruction directly onto the stack.
     fn pushCompiled(c: &Compiler, i: &const Instruction) !void {
-        try c.insts.append(PartialInst { .Compiled = *i });
+        try c.insts.append(PartialInst { .Compiled = i.* });
     }
 
     // Push a instruction with a hole onto the set
     fn pushHole(c: &Compiler, i: &const InstHole) !Hole {
         const h = c.insts.len;
-        try c.insts.append(PartialInst { .Uncompiled = *i });
+        try c.insts.append(PartialInst { .Uncompiled = i.* });
         return Hole { .One = h };
     }
 
     // Patch an individual hole with the specified output address.
     fn fill(c: &Compiler, hole: &const Hole, goto1: usize) void {
-        switch (*hole) {
+        switch (hole.*) {
             Hole.None => {},
             Hole.One => |pc| c.insts.toSlice()[pc].fill(goto1),
             Hole.Many => |holes| {

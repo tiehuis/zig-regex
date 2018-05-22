@@ -40,7 +40,7 @@ pub const Regex = struct {
         var c = Compiler.init(a);
         defer c.deinit();
 
-        return Regex {
+        return Regex{
             .allocator = a,
             .compiled = try c.compile(expr),
             .slots = ArrayList(?usize).init(a),
@@ -94,7 +94,7 @@ pub const Captures = struct {
     slots: []const ?usize,
 
     pub fn init(input: []const u8, slots: &ArrayList(?usize)) Captures {
-        return Captures {
+        return Captures{
             .input = input,
             .allocator = slots.allocator,
             .slots = slots.toOwnedSlice(),
@@ -125,8 +125,8 @@ pub const Captures = struct {
 
         if (base < self.slots.len) {
             if (self.slots[base]) |lower| {
-                const upper = ??self.slots[base+1];
-                return Span {
+                const upper = ??self.slots[base + 1];
+                return Span{
                     .lower = lower,
                     .upper = upper,
                 };

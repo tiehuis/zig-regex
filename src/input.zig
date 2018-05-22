@@ -33,7 +33,7 @@ pub const Input = struct {
     }
 
     pub fn isEmptyMatch(self: &const Input, match: &const Assertion) bool {
-        switch (*match) {
+        switch (match.*) {
             Assertion.None => {
                 return true;
             },

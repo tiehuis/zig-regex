@@ -34,9 +34,9 @@ const ExecState = struct {
     slot_count: usize,
 
     pub fn init(allocator: &Allocator, program: &const Program) Self {
-        return Self {
+        return Self{
             .arena = ArenaAllocator.init(allocator),
-            .slot_count = program.slot_count
+            .slot_count = program.slot_count,
         };
     }
 
@@ -63,9 +63,7 @@ pub const VmPike = struct {
     allocator: &Allocator,
 
     pub fn init(allocator: &Allocator) Self {
-        return Self {
-            .allocator = allocator,
-        };
+        return Self{ .allocator = allocator };
     }
 
     pub fn exec(self: &Self, prog: &const Program, prog_start: usize, input: &Input, slots: &ArrayList(?usize)) !bool {
@@ -78,7 +76,10 @@ pub const VmPike = struct {
         var state = ExecState.init(self.allocator, prog);
         defer state.deinit();
 
-        const t = Thread { .pc = prog_start, .slots = try state.newSlot() };
+        const t = Thread{
+            .pc = prog_start,
+            .slots = try state.newSlot(),
+        };
         try clist.append(t);
 
         var matched: ?[]?usize = null;
@@ -91,22 +92,34 @@ pub const VmPike = struct {
                 switch (inst.data) {
                     InstructionData.Char => |ch| {
                         if (at != null and ??at == ch) {
-                            try nlist.append(Thread { .pc = inst.out, .slots = thread.slots });
+                            try nlist.append(Thread{
+                                .pc = inst.out,
+                                .slots = thread.slots,
+                            });
                         }
                     },
                     InstructionData.EmptyMatch => |assertion| {
                         if (input.isEmptyMatch(assertion)) {
-                            try clist.append(Thread { .pc = inst.out, .slots = thread.slots });
+                            try clist.append(Thread{
+                                .pc = inst.out,
+                                .slots = thread.slots,
+                            });
                         }
                     },
                     InstructionData.ByteClass => |class| {
                         if (at != null and class.contains(??at)) {
-                            try nlist.append(Thread { .pc = inst.out, .slots = thread.slots });
+                            try nlist.append(Thread{
+                                .pc = inst.out,
+                                .slots = thread.slots,
+                            });
                         }
                     },
                     InstructionData.AnyCharNotNL => {
                         if (at != null and ??at != '\n') {
-                            try nlist.append(Thread { .pc = inst.out, .slots = thread.slots });
+                            try nlist.append(Thread{
+                                .pc = inst.out,
+                                .slots = thread.slots,
+                            });
                         }
                     },
                     InstructionData.Match => {
@@ -131,19 +144,31 @@ pub const VmPike = struct {
                     InstructionData.Save => |slot| {
                         // We don't need a deep copy here since we only ever advance forward so
                         // all future captures are valid for any subsequent threads.
-                        var new_thread = Thread { .pc = inst.out, .slots = thread.slots };
+                        var new_thread = Thread{
+                            .pc = inst.out,
+                            .slots = thread.slots,
+                        };
 
                         new_thread.slots[slot] = input.byte_pos;
                         try clist.append(new_thread);
                     },
                     InstructionData.Jump => {
-                        try clist.append(Thread { .pc = inst.out, .slots = thread.slots });
+                        try clist.append(Thread{
+                            .pc = inst.out,
+                            .slots = thread.slots,
+                        });
                     },
                     InstructionData.Split => |split| {
                         // Split pushed first since we want to handle the branch secondary to the
                         // current thread (popped from end).
-                        try clist.append(Thread { .pc = split, .slots = try state.cloneSlots(thread.slots) });
-                        try clist.append(Thread { .pc = inst.out, .slots = thread.slots });
+                        try clist.append(Thread{
+                            .pc = split,
+                            .slots = try state.cloneSlots(thread.slots),
+                        });
+                        try clist.append(Thread{
+                            .pc = inst.out,
+                            .slots = thread.slots,
+                        });
                     },
                 }
             }
@@ -161,4 +186,3 @@ pub const VmPike = struct {
         return false;
     }
 };
-

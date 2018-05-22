@@ -71,7 +71,7 @@ fn reprIndent(out: &StaticOutStream, e: &Expr, indent: usize) error!void {
         try out.stream.print(" ");
     }
 
-    switch (*e) {
+    switch (e.*) {
         Expr.AnyCharNotNL => {
             try out.stream.print("dot\n");
         },
@@ -134,7 +134,7 @@ fn reprIndent(out: &StaticOutStream, e: &Expr, indent: usize) error!void {
         },
         // NOTE: Shouldn't occur ever in returned output.
         Expr.PseudoLeftParen => {
-            try out.stream.print("{}\n", @tagName(*e));
+            try out.stream.print("{}\n", @tagName(e.*));
         },
     }
 }

@@ -67,10 +67,7 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
             \\pikevm:    {}
             \\backtrack: {}
             \\
-            ,
-            pike_result,
-            backtrack_result
-        );
+        , pike_result, backtrack_result);
 
         debug.warn(
             \\
@@ -103,11 +100,7 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
             \\String:   '{}'
             \\Expected: {}
             \\
-            ,
-            re_input,
-            to_match,
-            expected,
-        );
+        , re_input, to_match, expected);
 
         // Dump expression tree and bytecode
         var p = Parser.init(debug.global_allocator);
@@ -159,7 +152,7 @@ test "pikevm == backtrackvm" {
     check("[\\d]", "d", false);
     check("[^\\D]", "d", false);
     check("[\\D]", "d", true);
-    check("^.*\\\\.*$","c:\\Tools", true);
+    check("^.*\\\\.*$", "c:\\Tools", true);
     check("^[\\+-]*[\\d]+$", "+27", true);
     check("[abc]", "1c2", true);
     check("[abc]", "1C2", false);

@@ -37,29 +37,29 @@ fn dumpExprIndent(e: &const Expr, indent: usize) void {
         debug.warn(" ");
     }
 
-    switch (*e) {
+    switch (e.*) {
         Expr.AnyCharNotNL => {
-            debug.warn("{}\n", @tagName(*e));
+            debug.warn("{}\n", @tagName(e.*));
         },
         Expr.EmptyMatch => |assertion| {
-            debug.warn("{}({})\n", @tagName(*e), @tagName(assertion));
+            debug.warn("{}({})\n", @tagName(e.*), @tagName(assertion));
         },
         Expr.Literal => |lit| {
-            debug.warn("{}(", @tagName(*e));
+            debug.warn("{}(", @tagName(e.*));
             printCharEscaped(lit);
             debug.warn(")\n");
         },
         Expr.Capture => |subexpr| {
-            debug.warn("{}\n", @tagName(*e));
+            debug.warn("{}\n", @tagName(e.*));
             dumpExprIndent(subexpr, indent + 1);
         },
         Expr.Repeat => |repeat| {
             debug.warn("{}(min={}, max={}, greedy={})\n",
-                @tagName(*e), repeat.min, repeat.max, repeat.greedy);
+                @tagName(e.*), repeat.min, repeat.max, repeat.greedy);
             dumpExprIndent(repeat.subexpr, indent + 1);
         },
         Expr.ByteClass => |class| {
-            debug.warn("{}(", @tagName(*e));
+            debug.warn("{}(", @tagName(e.*));
             for (class.ranges.toSliceConst()) |r| {
                 debug.warn("[");
                 printCharEscaped(r.min);
@@ -71,18 +71,18 @@ fn dumpExprIndent(e: &const Expr, indent: usize) void {
         },
         // TODO: Can we get better type unification on enum variants with the same type?
         Expr.Concat => |subexprs| {
-            debug.warn("{}\n", @tagName(*e));
+            debug.warn("{}\n", @tagName(e.*));
             for (subexprs.toSliceConst()) |s|
                 dumpExprIndent(s, indent + 1);
         },
         Expr.Alternate => |subexprs| {
-            debug.warn("{}\n", @tagName(*e));
+            debug.warn("{}\n", @tagName(e.*));
             for (subexprs.toSliceConst()) |s|
                 dumpExprIndent(s, indent + 1);
         },
         // NOTE: Shouldn't occur ever in returned output.
         Expr.PseudoLeftParen => {
-            debug.warn("{}\n", @tagName(*e));
+            debug.warn("{}\n", @tagName(e.*));
         },
     }
 }
