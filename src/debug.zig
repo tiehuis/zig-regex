@@ -3,7 +3,6 @@
 
 const debug = @import("std").debug;
 
-
 use @import("parse.zig");
 
 pub fn printCharEscaped(ch: u8) void {
@@ -18,7 +17,7 @@ pub fn printCharEscaped(ch: u8) void {
             debug.warn("\\n");
         },
         // printable characters
-        32 ... 126 => {
+        32...126 => {
             debug.warn("{c}", ch);
         },
         else => {
@@ -27,11 +26,11 @@ pub fn printCharEscaped(ch: u8) void {
     }
 }
 
-pub fn dumpExpr(e: &const Expr) void {
+pub fn dumpExpr(e: *const Expr) void {
     dumpExprIndent(e, 0);
 }
 
-fn dumpExprIndent(e: &const Expr, indent: usize) void {
+fn dumpExprIndent(e: *const Expr, indent: usize) void {
     var i: usize = 0;
     while (i < indent) : (i += 1) {
         debug.warn(" ");
@@ -54,8 +53,7 @@ fn dumpExprIndent(e: &const Expr, indent: usize) void {
             dumpExprIndent(subexpr, indent + 1);
         },
         Expr.Repeat => |repeat| {
-            debug.warn("{}(min={}, max={}, greedy={})\n",
-                @tagName(e.*), repeat.min, repeat.max, repeat.greedy);
+            debug.warn("{}(min={}, max={}, greedy={})\n", @tagName(e.*), repeat.min, repeat.max, repeat.greedy);
             dumpExprIndent(repeat.subexpr, indent + 1);
         },
         Expr.ByteClass => |class| {
@@ -87,10 +85,9 @@ fn dumpExprIndent(e: &const Expr, indent: usize) void {
     }
 }
 
-
 use @import("compile.zig");
 
-pub fn dumpInstruction(s: &const Instruction) void {
+pub fn dumpInstruction(s: *const Instruction) void {
     switch (s.data) {
         InstructionData.Char => |ch| {
             debug.warn("char({}) '{c}'\n", s.out, ch);
@@ -122,8 +119,7 @@ pub fn dumpInstruction(s: &const Instruction) void {
     }
 }
 
-
-pub fn dumpProgram(s: &const Program) void {
+pub fn dumpProgram(s: *const Program) void {
     debug.warn("start: {}\n\n", s.start);
     for (s.insts) |inst, i| {
         debug.warn("L{}: ", i);

@@ -44,42 +44,40 @@ const ExecState = struct {
     // cache (we can bound this visited bitset since we bound when we use the backtracking engine.
     visited: [BitsetLen]BitsetType,
 
-    prog: &const Program,
+    prog: *const Program,
 
-    slots: &ArrayList(?usize),
+    slots: *ArrayList(?usize),
 };
 
 // This is bounded and only used for small compiled regexes. It is not quadratic since pre-seen
 // nodes are cached across threads.
 pub const VmBacktrack = struct {
     const Self = this;
-    allocator: &Allocator,
+    allocator: *Allocator,
 
-    pub fn init(allocator: &Allocator) Self {
-        return Self {
-            .allocator = allocator,
-        };
+    pub fn init(allocator: *Allocator) Self {
+        return Self{ .allocator = allocator };
     }
 
-    fn shouldExec(prog: &const Program, input: &const Input) bool {
+    fn shouldExec(prog: *const Program, input: *const Input) bool {
         return (prog.insts.len + 1) * (input.bytes.len + 1) < ExecState.BitsetLen * @sizeOf(ExecState.BitsetType);
     }
 
-    pub fn exec(self: &Self, prog: &const Program, prog_start: usize, input: &Input, slots: &ArrayList(?usize)) !bool {
+    pub fn exec(self: *Self, prog: *const Program, prog_start: usize, input: *Input, slots: *ArrayList(?usize)) !bool {
         // Should never run this without first checking shouldExec and running only if true.
         debug.assert(shouldExec(prog, input));
 
         var jobs = ArrayList(Job).init(self.allocator);
         defer jobs.deinit();
 
-        var state = ExecState {
+        var state = ExecState{
             .jobs = jobs,
             .visited = []u32{0} ** 512,
             .prog = prog,
             .slots = slots,
         };
 
-        const t = Job { .Thread = Thread { .ip = prog_start, .input = input.clone() }};
+        const t = Job{ .Thread = Thread{ .ip = prog_start, .input = input.clone() } };
         try state.jobs.append(t);
 
         while (state.jobs.popOrNull()) |job| {
@@ -100,7 +98,7 @@ pub const VmBacktrack = struct {
         return false;
     }
 
-    fn step(state: &ExecState, thread: &const Thread) !bool {
+    fn step(state: *ExecState, thread: *const Thread) !bool {
         // For linear actions, we can just modify the current thread and avoid pushing new items
         // to the stack.
         var input = thread.input;
@@ -144,17 +142,19 @@ pub const VmBacktrack = struct {
                     while (state.slots.len <= slot) {
                         // TODO: Can't append null as optional
                         try state.slots.append(0);
-                        state.slots.toSlice()[state.slots.len-1] = null;
+                        state.slots.toSlice()[state.slots.len - 1] = null;
                     }
 
                     // We can save an existing match by creating a job which will run on this thread
                     // failing. This will reset to the old match before any subsequent splits in
                     // this thread.
                     if (state.slots.at(slot)) |last_pos| {
-                        const job = Job { .SaveRestore = SaveRestore {
-                            .slot = slot,
-                            .last_pos = last_pos,
-                        }};
+                        const job = Job{
+                            .SaveRestore = SaveRestore{
+                                .slot = slot,
+                                .last_pos = last_pos,
+                            },
+                        };
                         try state.jobs.append(job);
                     }
 
@@ -167,9 +167,9 @@ pub const VmBacktrack = struct {
                     // Jump at end of loop
                 },
                 InstructionData.Split => |split| {
-                    const t = Job { .Thread = Thread { .ip = split, .input = input.clone() }};
+                    const t = Job{ .Thread = Thread{ .ip = split, .input = input.clone() } };
                     try state.jobs.append(t);
-                }
+                },
             }
 
             ip = inst.out;
@@ -177,7 +177,7 @@ pub const VmBacktrack = struct {
     }
 
     // checks if we have visited this specific node and if not, set the bit and return true
-    fn shouldVisit(state: &ExecState, ip: usize, at: usize) bool {
+    fn shouldVisit(state: *ExecState, ip: usize, at: usize) bool {
         const BitsetType = ExecState.BitsetType;
         const BitsetShiftType = std.math.Log2Int(BitsetType);
 
@@ -185,11 +185,11 @@ pub const VmBacktrack = struct {
         const n = ip * (state.prog.insts.len + 1) + at;
         const bitmask = BitsetType(1) << BitsetShiftType(n & (size - 1));
 
-        if ((state.visited[n/size] & bitmask) != 0) {
+        if ((state.visited[n / size] & bitmask) != 0) {
             return false;
         }
 
-        state.visited[n/size] |= bitmask;
+        state.visited[n / size] |= bitmask;
         return true;
     }
 };

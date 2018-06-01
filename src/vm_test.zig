@@ -133,7 +133,6 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
 
 test "pikevm == backtrackvm" {
     // Taken from tiny-regex-c
-
     check("\\d", "5", true);
     check("\\w+", "hej", true);
     check("\\s", "\t \n", true);

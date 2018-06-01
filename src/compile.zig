@@ -36,8 +36,8 @@ pub const Instruction = struct {
     // Associated data with this
     data: InstructionData,
 
-    pub fn new(out: usize, data: &const InstructionData) Instruction {
-        return Instruction {
+    pub fn new(out: usize, data: *const InstructionData) Instruction {
+        return Instruction{
             .out = out,
             .data = data.*,
         };
@@ -74,7 +74,7 @@ const PartialInst = union(enum) {
     Uncompiled: InstHole,
 
     // Modify the current instruction to point to the specified instruction.
-    pub fn fill(s: &PartialInst, i: usize) void {
+    pub fn fill(s: *PartialInst, i: usize) void {
         switch (s.*) {
             PartialInst.Uncompiled => |ih| {
                 var comp: Instruction = undefined;
@@ -83,35 +83,28 @@ const PartialInst = union(enum) {
                 // instruction, except for the dual split case, in which both outgoing pointers
                 // go to the same place.
                 const compiled = switch (ih) {
-                    InstHole.Char => |ch|
-                        Instruction.new(i, InstructionData { .Char = ch }),
+                    InstHole.Char => |ch| Instruction.new(i, InstructionData{ .Char = ch }),
 
-                    InstHole.EmptyMatch => |assertion|
-                        Instruction.new(i, InstructionData { .EmptyMatch = assertion }),
+                    InstHole.EmptyMatch => |assertion| Instruction.new(i, InstructionData{ .EmptyMatch = assertion }),
 
-                    InstHole.AnyCharNotNL =>
-                        Instruction.new(i, InstructionData.AnyCharNotNL),
+                    InstHole.AnyCharNotNL => Instruction.new(i, InstructionData.AnyCharNotNL),
 
-                    InstHole.ByteClass => |class|
-                        Instruction.new(i, InstructionData { .ByteClass = class }),
+                    InstHole.ByteClass => |class| Instruction.new(i, InstructionData{ .ByteClass = class }),
 
                     InstHole.Split =>
-                        // If we both point to the same output, we can encode as a jump
-                        Instruction.new(i, InstructionData.Jump),
+                    // If we both point to the same output, we can encode as a jump
+                    Instruction.new(i, InstructionData.Jump),
 
                     // 1st was already filled
-                    InstHole.Split1 => |split|
-                        Instruction.new(split, InstructionData { .Split = i }),
+                    InstHole.Split1 => |split| Instruction.new(split, InstructionData{ .Split = i }),
 
                     // 2nd was already filled
-                    InstHole.Split2 => |split|
-                        Instruction.new(i, InstructionData { .Split = split }),
+                    InstHole.Split2 => |split| Instruction.new(i, InstructionData{ .Split = split }),
 
-                    InstHole.Save => |slot|
-                        Instruction.new(i, InstructionData { .Save = slot }),
+                    InstHole.Save => |slot| Instruction.new(i, InstructionData{ .Save = slot }),
                 };
 
-                s.* = PartialInst { .Compiled = compiled };
+                s.* = PartialInst{ .Compiled = compiled };
             },
             PartialInst.Compiled => {
                 // nothing to do, already filled
@@ -131,10 +124,10 @@ pub const Program = struct {
     // Max number of slots required
     slot_count: usize,
     // Allocator which owns the instructions
-    allocator: &Allocator,
+    allocator: *Allocator,
 
-    pub fn init(allocator: &Allocator, a: []const Instruction, find_start: usize, slot_count: usize) Program {
-        return Program {
+    pub fn init(allocator: *Allocator, a: []const Instruction, find_start: usize, slot_count: usize) Program {
+        return Program{
             .allocator = allocator,
             .insts = a,
             .start = 0,
@@ -143,7 +136,7 @@ pub const Program = struct {
         };
     }
 
-    pub fn deinit(p: &Program) void {
+    pub fn deinit(p: *Program) void {
         p.allocator.free(p.insts);
     }
 };
@@ -170,41 +163,41 @@ const Patch = struct {
 pub const Compiler = struct {
     // Stores all partial instructions
     insts: ArrayList(PartialInst),
-    allocator: &Allocator,
+    allocator: *Allocator,
     // Capture state
     capture_index: usize,
 
-    pub fn init(a: &Allocator) Compiler {
-        return Compiler {
+    pub fn init(a: *Allocator) Compiler {
+        return Compiler{
             .insts = ArrayList(PartialInst).init(a),
             .allocator = a,
             .capture_index = 0,
         };
     }
 
-    pub fn deinit(c: &Compiler) void {
+    pub fn deinit(c: *Compiler) void {
         c.insts.deinit();
     }
 
-    fn nextCaptureIndex(c: &Compiler) usize {
+    fn nextCaptureIndex(c: *Compiler) usize {
         const s = c.capture_index;
         c.capture_index += 2;
         return s;
     }
 
     // Compile the regex expression
-    pub fn compile(c: &Compiler, expr: &const Expr) !Program {
+    pub fn compile(c: *Compiler, expr: *const Expr) !Program {
         // surround in a full program match
         const entry = c.insts.len;
         const index = c.nextCaptureIndex();
-        try c.pushCompiled(Instruction.new(entry + 1, InstructionData { .Save = index }));
+        try c.pushCompiled(Instruction.new(entry + 1, InstructionData{ .Save = index }));
 
         // compile the main expression
         const patch = try c.compileInternal(expr);
 
         // not iterating over an empty correctly in backtrack
         c.fillToNext(patch.hole);
-        const h = try c.pushHole(InstHole { .Save = index + 1 });
+        const h = try c.pushHole(InstHole{ .Save = index + 1 });
 
         // fill any holes to end at the next instruction which will be a match
         c.fillToNext(h);
@@ -220,7 +213,7 @@ pub const Compiler = struct {
                 },
                 else => |inner| {
                     @panic("uncompiled instruction encountered during compilation");
-                }
+                },
             }
         }
 
@@ -235,8 +228,8 @@ pub const Compiler = struct {
         // 3: split 1, 4
         // 4: any 3
         const fragment_start = c.insts.len;
-        const fragment = []Instruction {
-            Instruction.new(0, InstructionData { .Split = fragment_start + 1 }),
+        const fragment = []Instruction{
+            Instruction.new(0, InstructionData{ .Split = fragment_start + 1 }),
             Instruction.new(fragment_start, InstructionData.AnyCharNotNL),
         };
         try p.appendSlice(fragment);
@@ -244,24 +237,24 @@ pub const Compiler = struct {
         return Program.init(p.allocator, p.toOwnedSlice(), fragment_start, c.capture_index);
     }
 
-    fn compileInternal(c: &Compiler, expr: &const Expr) Allocator.Error!Patch {
+    fn compileInternal(c: *Compiler, expr: *const Expr) Allocator.Error!Patch {
         switch (expr.*) {
             Expr.Literal => |lit| {
-                const h = try c.pushHole(InstHole { .Char = lit });
-                return Patch { .hole = h, .entry = c.insts.len - 1 };
+                const h = try c.pushHole(InstHole{ .Char = lit });
+                return Patch{ .hole = h, .entry = c.insts.len - 1 };
             },
             Expr.ByteClass => |classes| {
                 // Similar, we use a special instruction.
-                const h = try c.pushHole(InstHole { .ByteClass = classes });
-                return Patch { .hole = h, .entry = c.insts.len - 1 };
+                const h = try c.pushHole(InstHole{ .ByteClass = classes });
+                return Patch{ .hole = h, .entry = c.insts.len - 1 };
             },
             Expr.AnyCharNotNL => {
                 const h = try c.pushHole(InstHole.AnyCharNotNL);
-                return Patch { .hole = h, .entry = c.insts.len - 1 };
+                return Patch{ .hole = h, .entry = c.insts.len - 1 };
             },
             Expr.EmptyMatch => |assertion| {
-                const h = try c.pushHole(InstHole { .EmptyMatch = assertion });
-                return Patch { .hole = h, .entry = c.insts.len - 1 };
+                const h = try c.pushHole(InstHole{ .EmptyMatch = assertion });
+                return Patch{ .hole = h, .entry = c.insts.len - 1 };
             },
             Expr.Repeat => |repeat| {
                 // Case 1: *
@@ -296,7 +289,7 @@ pub const Compiler = struct {
                     const st = try c.compileStar(repeat.subexpr, repeat.greedy);
                     c.fill(hole, st.entry);
 
-                    return Patch { .hole = st.hole, .entry = entry };
+                    return Patch{ .hole = st.hole, .entry = entry };
                 }
                 // Case 5: {m,n} and {m}
                 else {
@@ -319,7 +312,7 @@ pub const Compiler = struct {
                         hole = ep.hole;
                     }
 
-                    return Patch { .hole = hole, .entry = entry };
+                    return Patch{ .hole = hole, .entry = entry };
                 }
             },
             Expr.Concat => |subexprs| {
@@ -340,7 +333,7 @@ pub const Compiler = struct {
                     hole = ep.hole;
                 }
 
-                return Patch { .hole = hole, .entry = entry };
+                return Patch{ .hole = hole, .entry = entry };
             },
             Expr.Capture => |subexpr| {
                 // 1: save 1, 2
@@ -353,13 +346,13 @@ pub const Compiler = struct {
 
                 const index = c.nextCaptureIndex();
 
-                try c.pushCompiled(Instruction.new(entry + 1, InstructionData { .Save = index }));
+                try c.pushCompiled(Instruction.new(entry + 1, InstructionData{ .Save = index }));
                 const p = try c.compileInternal(subexpr);
                 c.fillToNext(p.hole);
 
-                const h = try c.pushHole(InstHole { .Save = index + 1 });
+                const h = try c.pushHole(InstHole{ .Save = index + 1 });
 
-                return Patch { .hole = h, .entry = entry };
+                return Patch{ .hole = h, .entry = entry };
             },
             Expr.Alternate => |subexprs| {
                 // Alternation with one path does not make sense
@@ -387,13 +380,13 @@ pub const Compiler = struct {
                 last_hole.* = Hole.None;
 
                 // This compiles one branch of the split at a time.
-                for (subexprs.toSliceConst()[0..subexprs.len-1]) |subexpr| {
+                for (subexprs.toSliceConst()[0 .. subexprs.len - 1]) |subexpr| {
                     c.fillToNext(last_hole);
 
                     // next entry will be a sub-expression
                     //
                     // We fill the second part of this hole on the next sub-expression.
-                    last_hole.* = try c.pushHole(InstHole { .Split1 = c.insts.len + 1 });
+                    last_hole.* = try c.pushHole(InstHole{ .Split1 = c.insts.len + 1 });
 
                     // compile the subexpression
                     const p = try c.compileInternal(subexpr);
@@ -403,24 +396,24 @@ pub const Compiler = struct {
                 }
 
                 // one entry left, push a sub-expression so we end with a double-subexpression.
-                const p = try c.compileInternal(subexprs.toSliceConst()[subexprs.len-1]);
+                const p = try c.compileInternal(subexprs.toSliceConst()[subexprs.len - 1]);
                 c.fill(last_hole, p.entry);
 
                 // push the last sub-expression hole
                 try holes.append(p.hole);
 
                 // return many holes which are all to be filled to the next instruction
-                return Patch { .hole = Hole { .Many = holes }, .entry = entry };
+                return Patch{ .hole = Hole{ .Many = holes }, .entry = entry };
             },
             Expr.PseudoLeftParen => {
                 @panic("internal error, encountered PseudoLeftParen");
             },
         }
 
-        return Patch { .hole = Hole.None, .entry = c.insts.len };
+        return Patch{ .hole = Hole.None, .entry = c.insts.len };
     }
 
-    fn compileStar(c: &Compiler, expr: &Expr, greedy: bool) !Patch {
+    fn compileStar(c: *Compiler, expr: *Expr, greedy: bool) !Patch {
         // 1: split 2, 4
         // 2: subexpr
         // 3: jmp 1
@@ -434,12 +427,10 @@ pub const Compiler = struct {
 
         // * or *? variant, simply switch the branches, the matcher manages precedence
         // of the executing threads.
-        const partial_inst =
-            if (greedy)
-                InstHole { .Split1 = c.insts.len + 1 }
-            else
-                InstHole { .Split2 = c.insts.len + 1 }
-            ;
+        const partial_inst = if (greedy)
+            InstHole{ .Split1 = c.insts.len + 1 }
+        else
+            InstHole{ .Split2 = c.insts.len + 1 };
 
         const h = try c.pushHole(partial_inst);
 
@@ -453,10 +444,10 @@ pub const Compiler = struct {
         try c.pushCompiled(Instruction.new(entry, InstructionData.Jump));
 
         // Return a filled patch set to the first split instruction.
-        return Patch { .hole = h, .entry = entry };
+        return Patch{ .hole = h, .entry = entry };
     }
 
-    fn compilePlus(c: &Compiler, expr: &Expr, greedy: bool) !Patch {
+    fn compilePlus(c: *Compiler, expr: *Expr, greedy: bool) !Patch {
         // 1: subexpr
         // 2: split 1, 3
         // 3: ...
@@ -469,32 +460,28 @@ pub const Compiler = struct {
 
         // split 3, 1 (non-greedy)
         // Point back to the upcoming next instruction (will always be filled).
-        const partial_inst =
-            if (greedy)
-                InstHole { .Split1 = p.entry }
-            else
-                InstHole { .Split2 = p.entry }
-            ;
+        const partial_inst = if (greedy)
+            InstHole{ .Split1 = p.entry }
+        else
+            InstHole{ .Split2 = p.entry };
 
         const h = try c.pushHole(partial_inst);
 
         // split to the next instruction
-        return Patch { .hole = h, .entry = p.entry };
+        return Patch{ .hole = h, .entry = p.entry };
     }
 
-    fn compileQuestion(c: &Compiler, expr: &Expr, greedy: bool) !Patch {
+    fn compileQuestion(c: *Compiler, expr: *Expr, greedy: bool) !Patch {
         // 1: split 2, 3
 
         // 2: subexpr
         // 3: ...
 
         // Create a partial instruction with a hole outgoing at the current location.
-        const partial_inst =
-            if (greedy)
-                InstHole { .Split1 = c.insts.len + 1 }
-            else
-                InstHole { .Split2 = c.insts.len + 1 }
-            ;
+        const partial_inst = if (greedy)
+            InstHole{ .Split1 = c.insts.len + 1 }
+        else
+            InstHole{ .Split2 = c.insts.len + 1 };
 
         const h = try c.pushHole(partial_inst);
 
@@ -507,23 +494,23 @@ pub const Compiler = struct {
         try holes.append(p.hole);
 
         // Return a filled patch set to the first split instruction.
-        return Patch { .hole = Hole { .Many = holes }, .entry = p.entry - 1 };
+        return Patch{ .hole = Hole{ .Many = holes }, .entry = p.entry - 1 };
     }
 
     // Push a compiled instruction directly onto the stack.
-    fn pushCompiled(c: &Compiler, i: &const Instruction) !void {
-        try c.insts.append(PartialInst { .Compiled = i.* });
+    fn pushCompiled(c: *Compiler, i: *const Instruction) !void {
+        try c.insts.append(PartialInst{ .Compiled = i.* });
     }
 
     // Push a instruction with a hole onto the set
-    fn pushHole(c: &Compiler, i: &const InstHole) !Hole {
+    fn pushHole(c: *Compiler, i: *const InstHole) !Hole {
         const h = c.insts.len;
-        try c.insts.append(PartialInst { .Uncompiled = i.* });
-        return Hole { .One = h };
+        try c.insts.append(PartialInst{ .Uncompiled = i.* });
+        return Hole{ .One = h };
     }
 
     // Patch an individual hole with the specified output address.
-    fn fill(c: &Compiler, hole: &const Hole, goto1: usize) void {
+    fn fill(c: *Compiler, hole: *const Hole, goto1: usize) void {
         switch (hole.*) {
             Hole.None => {},
             Hole.One => |pc| c.insts.toSlice()[pc].fill(goto1),
@@ -535,7 +522,7 @@ pub const Compiler = struct {
     }
 
     // Patch a hole to point to the next instruction
-    fn fillToNext(c: &Compiler, hole: &const Hole) void {
+    fn fillToNext(c: *Compiler, hole: *const Hole) void {
         c.fill(hole, c.insts.len);
     }
 };

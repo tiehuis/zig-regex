@@ -33,24 +33,24 @@ const ExecState = struct {
     arena: ArenaAllocator,
     slot_count: usize,
 
-    pub fn init(allocator: &Allocator, program: &const Program) Self {
+    pub fn init(allocator: *Allocator, program: *const Program) Self {
         return Self{
             .arena = ArenaAllocator.init(allocator),
             .slot_count = program.slot_count,
         };
     }
 
-    pub fn deinit(self: &Self) void {
+    pub fn deinit(self: *Self) void {
         self.arena.deinit();
     }
 
-    pub fn newSlot(self: &Self) ![]?usize {
+    pub fn newSlot(self: *Self) ![]?usize {
         var slots = try self.arena.allocator.alloc(?usize, self.slot_count);
         mem.set(?usize, slots, null);
         return slots;
     }
 
-    pub fn cloneSlots(self: &Self, other: []?usize) ![]?usize {
+    pub fn cloneSlots(self: *Self, other: []?usize) ![]?usize {
         var slots = try self.arena.allocator.alloc(?usize, self.slot_count);
         mem.copy(?usize, slots, other);
         return slots;
@@ -60,13 +60,13 @@ const ExecState = struct {
 pub const VmPike = struct {
     const Self = this;
 
-    allocator: &Allocator,
+    allocator: *Allocator,
 
-    pub fn init(allocator: &Allocator) Self {
+    pub fn init(allocator: *Allocator) Self {
         return Self{ .allocator = allocator };
     }
 
-    pub fn exec(self: &Self, prog: &const Program, prog_start: usize, input: &Input, slots: &ArrayList(?usize)) !bool {
+    pub fn exec(self: *Self, prog: *const Program, prog_start: usize, input: *Input, slots: *ArrayList(?usize)) !bool {
         var clist = ArrayList(Thread).init(self.allocator);
         defer clist.deinit();
 

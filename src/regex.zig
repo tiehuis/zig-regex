@@ -22,7 +22,7 @@ const InputBytes = @import("input.zig").InputBytes;
 
 pub const Regex = struct {
     // Internal allocator
-    allocator: &Allocator,
+    allocator: *Allocator,
     // A compiled set of instructions
     compiled: Program,
     // Capture slots
@@ -31,7 +31,7 @@ pub const Regex = struct {
     string: []const u8,
 
     // Compile a regex, possibly returning any error which occurred.
-    pub fn compile(a: &Allocator, re: []const u8) !Regex {
+    pub fn compile(a: *Allocator, re: []const u8) !Regex {
         var p = Parser.init(a);
         defer p.deinit();
 
@@ -48,18 +48,18 @@ pub const Regex = struct {
         };
     }
 
-    pub fn deinit(re: &Regex) void {
+    pub fn deinit(re: *Regex) void {
         re.compiled.deinit();
     }
 
     // Does the regex match at the start of the string?
-    pub fn match(re: &Regex, input_str: []const u8) !bool {
+    pub fn match(re: *Regex, input_str: []const u8) !bool {
         var input_bytes = InputBytes.init(input_str);
         return exec.exec(re.allocator, re.compiled, re.compiled.start, &input_bytes.input, &re.slots);
     }
 
     // Does the regex match anywhere in the string?
-    pub fn partialMatch(re: &Regex, input_str: []const u8) !bool {
+    pub fn partialMatch(re: *Regex, input_str: []const u8) !bool {
         var input_bytes = InputBytes.init(input_str);
         return exec.exec(re.allocator, re.compiled, re.compiled.find_start, &input_bytes.input, &re.slots);
     }
@@ -67,7 +67,7 @@ pub const Regex = struct {
     // Where in the string does the regex and its capture groups match?
     //
     // Zero capture is the entire match.
-    pub fn captures(re: &Regex, input_str: []const u8) !?Captures {
+    pub fn captures(re: *Regex, input_str: []const u8) !?Captures {
         var input_bytes = InputBytes.init(input_str);
         const is_match = try exec.exec(re.allocator, re.compiled, re.compiled.find_start, &input_bytes.input, &re.slots);
 
@@ -90,10 +90,10 @@ pub const Captures = struct {
     const Self = this;
 
     input: []const u8,
-    allocator: &Allocator,
+    allocator: *Allocator,
     slots: []const ?usize,
 
-    pub fn init(input: []const u8, slots: &ArrayList(?usize)) Captures {
+    pub fn init(input: []const u8, slots: *ArrayList(?usize)) Captures {
         return Captures{
             .input = input,
             .allocator = slots.allocator,
@@ -101,17 +101,17 @@ pub const Captures = struct {
         };
     }
 
-    pub fn deinit(self: &Self) void {
+    pub fn deinit(self: *Self) void {
         self.allocator.free(self.slots);
     }
 
-    pub fn len(self: &const Self) usize {
+    pub fn len(self: *const Self) usize {
         return self.slots.len / 2;
     }
 
     // Return the slice of the matching string for the specified capture index.
     // If the index did not participate in the capture group null is returned.
-    pub fn sliceAt(self: &const Self, n: usize) ?[]const u8 {
+    pub fn sliceAt(self: *const Self, n: usize) ?[]const u8 {
         if (self.boundsAt(n)) |span| {
             return self.input[span.lower..span.upper];
         }
@@ -120,7 +120,7 @@ pub const Captures = struct {
     }
 
     // Return the substring slices of the input directly.
-    pub fn boundsAt(self: &const Self, n: usize) ?Span {
+    pub fn boundsAt(self: *const Self, n: usize) ?Span {
         const base = 2 * n;
 
         if (base < self.slots.len) {

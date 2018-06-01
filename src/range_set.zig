@@ -18,11 +18,11 @@ pub fn Range(comptime T: type) type {
 
         pub fn new(min: T, max: T) Range(T) {
             debug.assert(min <= max);
-            return Range(T) { .min = min, .max = max };
+            return Range(T){ .min = min, .max = max };
         }
 
         pub fn single(item: T) Range(T) {
-            return Range(T) { .min = item, .max = item };
+            return Range(T){ .min = item, .max = item };
         }
     };
 }
@@ -38,18 +38,16 @@ pub fn RangeSet(comptime T: type) type {
         //  - x.max < y.min
         ranges: ArrayList(RangeType),
 
-        pub fn init(a: &Allocator) Self {
-            return Self {
-                .ranges = ArrayList(RangeType).init(a),
-            };
+        pub fn init(a: *Allocator) Self {
+            return Self{ .ranges = ArrayList(RangeType).init(a) };
         }
 
-        pub fn deinit(self: &Self) void {
+        pub fn deinit(self: *Self) void {
             self.ranges.deinit();
         }
 
         // Add a range into the current class, preserving the structure invariants.
-        pub fn addRange(self: &Self, range: &const RangeType) !void {
+        pub fn addRange(self: *Self, range: *const RangeType) !void {
             var ranges = &self.ranges;
 
             if (ranges.len == 0) {
@@ -91,7 +89,7 @@ pub fn RangeSet(comptime T: type) type {
         }
 
         // Merge two classes into one.
-        pub fn mergeClass(self: &Self, other: &const Self) !void {
+        pub fn mergeClass(self: *Self, other: *const Self) !void {
             for (other.ranges.toSliceConst()) |r| {
                 try self.addRange(r);
             }
@@ -101,7 +99,7 @@ pub fn RangeSet(comptime T: type) type {
         // the inverted set. i.e. contains(a, byte) == !contains(b, byte) if a == b.negated().
         //
         // The negation is performed in place.
-        pub fn negate(self: &Self) !void {
+        pub fn negate(self: *Self) !void {
             var ranges = &self.ranges;
             // NOTE: Append to end of array then copy and shrink.
             var negated = ArrayList(RangeType).init(self.ranges.allocator);
@@ -133,7 +131,7 @@ pub fn RangeSet(comptime T: type) type {
             negated.deinit();
         }
 
-        pub fn contains(self: &const Self, value: T) bool {
+        pub fn contains(self: *const Self, value: T) bool {
             // TODO: Binary search required for large unicode sets.
             for (self.ranges.toSliceConst()) |range| {
                 if (range.min <= value and value <= range.max) {
@@ -149,7 +147,7 @@ pub const ByteClassTemplates = struct {
     const ByteRange = Range(u8);
     const ByteClass = RangeSet(u8);
 
-    pub fn Whitespace(a: &Allocator) !ByteClass {
+    pub fn Whitespace(a: *Allocator) !ByteClass {
         var rs = ByteClass.init(a);
         errdefer rs.deinit();
 
@@ -161,7 +159,7 @@ pub const ByteClassTemplates = struct {
         return rs;
     }
 
-    pub fn NonWhitespace(a: &Allocator) !ByteClass {
+    pub fn NonWhitespace(a: *Allocator) !ByteClass {
         var rs = try Whitespace(a);
         errdefer rs.deinit();
 
@@ -169,7 +167,7 @@ pub const ByteClassTemplates = struct {
         return rs;
     }
 
-    pub fn AlphaNumeric(a: &Allocator) !ByteClass {
+    pub fn AlphaNumeric(a: *Allocator) !ByteClass {
         var rs = ByteClass.init(a);
         errdefer rs.deinit();
 
@@ -180,7 +178,7 @@ pub const ByteClassTemplates = struct {
         return rs;
     }
 
-    pub fn NonAlphaNumeric(a: &Allocator) !ByteClass {
+    pub fn NonAlphaNumeric(a: *Allocator) !ByteClass {
         var rs = try AlphaNumeric(a);
         errdefer rs.deinit();
 
@@ -188,7 +186,7 @@ pub const ByteClassTemplates = struct {
         return rs;
     }
 
-    pub fn Digits(a: &Allocator) !ByteClass {
+    pub fn Digits(a: *Allocator) !ByteClass {
         var rs = ByteClass.init(a);
         errdefer rs.deinit();
 
@@ -197,7 +195,7 @@ pub const ByteClassTemplates = struct {
         return rs;
     }
 
-    pub fn NonDigits(a: &Allocator) !ByteClass {
+    pub fn NonDigits(a: *Allocator) !ByteClass {
         var rs = try Digits(a);
         errdefer rs.deinit();
 

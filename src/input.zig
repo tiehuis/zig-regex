@@ -13,26 +13,26 @@ pub const Input = struct {
     bytes: []const u8,
     byte_pos: usize,
 
-    currentFn: fn(input: &const Input) ?u8,
-    advanceFn: fn(input: &Input) void,
-    isNextWordCharFn: fn(input: &const Input) bool,
-    isPrevWordCharFn: fn(input: &const Input) bool,
+    currentFn: fn (input: *const Input) ?u8,
+    advanceFn: fn (input: *Input) void,
+    isNextWordCharFn: fn (input: *const Input) bool,
+    isPrevWordCharFn: fn (input: *const Input) bool,
 
-    pub fn advance(self: &Input) void {
+    pub fn advance(self: *Input) void {
         self.advanceFn(self);
     }
 
-    pub fn current(self: &Input) ?u8 {
+    pub fn current(self: *Input) ?u8 {
         return self.currentFn(self);
     }
 
     // Note: We extend the range here to one past the end of the input. This is done in order to
     // handle complete matches correctly.
-    pub fn isConsumed(self: &const Input) bool {
+    pub fn isConsumed(self: *const Input) bool {
         return self.byte_pos > self.bytes.len;
     }
 
-    pub fn isEmptyMatch(self: &const Input, match: &const Assertion) bool {
+    pub fn isEmptyMatch(self: *const Input, match: *const Assertion) bool {
         switch (match.*) {
             Assertion.None => {
                 return true;
@@ -60,8 +60,8 @@ pub const Input = struct {
     }
 
     // Create a new instance using the same interface functions.
-    pub fn clone(self: &const Input) Input {
-        return Input {
+    pub fn clone(self: *const Input) Input {
+        return Input{
             .bytes = self.bytes,
             .byte_pos = self.byte_pos,
 
@@ -77,8 +77,8 @@ pub const InputBytes = struct {
     input: Input,
 
     pub fn init(bytes: []const u8) InputBytes {
-        return InputBytes {
-            .input = Input {
+        return InputBytes{
+            .input = Input{
                 .bytes = bytes,
                 .byte_pos = 0,
 
@@ -91,7 +91,7 @@ pub const InputBytes = struct {
     }
 
     // TODO: When we can compare ?usize == usize this will be a bit nicer.
-    fn current(self: &const Input) ?u8 {
+    fn current(self: *const Input) ?u8 {
         if (self.byte_pos < self.bytes.len) {
             return self.bytes[self.byte_pos];
         } else {
@@ -99,7 +99,7 @@ pub const InputBytes = struct {
         }
     }
 
-    fn advance(self: &Input) void {
+    fn advance(self: *Input) void {
         if (self.byte_pos <= self.bytes.len) {
             self.byte_pos += 1;
         }
@@ -107,16 +107,16 @@ pub const InputBytes = struct {
 
     fn isWordChar(c: u8) bool {
         return switch (c) {
-            '0' ... '9', 'a' ... 'z', 'A' ... 'Z' => true,
+            '0'...'9', 'a'...'z', 'A'...'Z' => true,
             else => false,
         };
     }
 
-    fn isNextWordChar(self: &const Input) bool {
+    fn isNextWordChar(self: *const Input) bool {
         return (self.byte_pos == 0) or isWordChar(self.bytes[self.byte_pos - 1]);
     }
 
-    fn isPrevWordChar(self: &const Input) bool {
+    fn isPrevWordChar(self: *const Input) bool {
         return (self.byte_pos >= self.bytes.len - 1) or isWordChar(self.bytes[self.byte_pos + 1]);
     }
 };

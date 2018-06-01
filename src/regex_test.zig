@@ -22,7 +22,7 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
             \\String:   '{}'
             \\Expected: {}
             \\
-            ,
+        ,
             re_input,
             to_match,
             expected,
@@ -59,7 +59,6 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
 
 test "regex sanity tests" {
     // Taken from tiny-regex-c
-
     check("\\d", "5", true);
     check("\\w+", "hej", true);
     check("\\s", "\t \n", true);
@@ -78,7 +77,7 @@ test "regex sanity tests" {
     check("[\\d]", "d", false);
     check("[^\\D]", "d", false);
     check("[\\D]", "d", true);
-    check("^.*\\\\.*$","c:\\Tools", true);
+    check("^.*\\\\.*$", "c:\\Tools", true);
     check("^[\\+-]*[\\d]+$", "+27", true);
     check("[abc]", "1c2", true);
     check("[abc]", "1C2", false);

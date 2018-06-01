@@ -21,22 +21,20 @@ const StaticOutStream = struct {
     pub const Stream = OutStream(Error);
 
     pub fn init(buffer: []u8) StaticOutStream {
-        return StaticOutStream {
+        return StaticOutStream{
             .buffer = buffer,
             .last = 0,
-            .stream = Stream {
-                .writeFn = writeFn,
-            },
+            .stream = Stream{ .writeFn = writeFn },
         };
     }
 
-    fn writeFn(out_stream: &Stream, bytes: []const u8) Error!void {
+    fn writeFn(out_stream: *Stream, bytes: []const u8) Error!void {
         const self = @fieldParentPtr(StaticOutStream, "stream", out_stream);
         mem.copy(u8, self.buffer[self.last..], bytes);
         self.last += bytes.len;
     }
 
-    pub fn printCharEscaped(self: &StaticOutStream, ch: u8) !void {
+    pub fn printCharEscaped(self: *StaticOutStream, ch: u8) !void {
         switch (ch) {
             '\t' => {
                 try self.stream.print("\\t");
@@ -48,7 +46,7 @@ const StaticOutStream = struct {
                 try self.stream.print("\\n");
             },
             // printable characters
-            32 ... 126 => {
+            32...126 => {
                 try self.stream.print("{c}", ch);
             },
             else => {
@@ -59,13 +57,13 @@ const StaticOutStream = struct {
 };
 
 // Return a minimal string representation of the expression tree.
-fn repr(e: &Expr) ![]u8 {
+fn repr(e: *Expr) ![]u8 {
     var stream = StaticOutStream.init(global_buffer[0..]);
     try reprIndent(&stream, e, 0);
     return global_buffer[0..stream.last];
 }
 
-fn reprIndent(out: &StaticOutStream, e: &Expr, indent: usize) error!void {
+fn reprIndent(out: *StaticOutStream, e: *Expr, indent: usize) error!void {
     var i: usize = 0;
     while (i < indent) : (i += 1) {
         try out.stream.print(" ");
@@ -149,7 +147,7 @@ fn check(re: []const u8, expected_ast: []const u8) void {
 
     var ast = repr(expr) catch unreachable;
 
-    const spaces = []const u8 { ' ', '\n' };
+    const spaces = []const u8{ ' ', '\n' };
     const trimmed_ast = mem.trim(u8, ast, spaces);
     const trimmed_expected_ast = mem.trim(u8, expected_ast, spaces);
 
@@ -421,43 +419,31 @@ test "parse escape" {
         \\ lit($)
     );
 
-    check(
-        "\\123"
-    ,
+    check("\\123",
         \\lit(S)
     );
 
-    check(
-        "\\1234"
-    ,
+    check("\\1234",
         \\cat
         \\ lit(S)
         \\ lit(4)
     );
 
-    check(
-        "\\x53"
-    ,
+    check("\\x53",
         \\lit(S)
     );
 
-    check(
-        "\\x534"
-    ,
+    check("\\x534",
         \\cat
         \\ lit(S)
         \\ lit(4)
     );
 
-    check(
-        "\\x{53}"
-    ,
+    check("\\x{53}",
         \\lit(S)
     );
 
-    check(
-        "\\x{53}4"
-    ,
+    check("\\x{53}4",
         \\cat
         \\ lit(S)
         \\ lit(4)
@@ -542,7 +528,7 @@ fn checkError(re: []const u8, expected_err: ParseError) void {
 
     if (parse_result) |expr| {
         const ast = repr(expr) catch unreachable;
-        const spaces = []const u8 { ' ', '\n' };
+        const spaces = []const u8{ ' ', '\n' };
         const trimmed_ast = mem.trim(u8, ast, spaces);
 
         debug.warn(
@@ -567,8 +553,7 @@ fn checkError(re: []const u8, expected_err: ParseError) void {
         );
 
         @panic("assertion failure");
-    }
-    else |found_err| {
+    } else |found_err| {
         if (found_err != expected_err) {
             debug.warn(
                 \\
@@ -599,143 +584,97 @@ fn checkError(re: []const u8, expected_err: ParseError) void {
 test "parse errors repeat" {
     checkError(
         \\*
-    ,
-        ParseError.MissingRepeatOperand
-    );
+    , ParseError.MissingRepeatOperand);
 
     checkError(
         \\(*
-    ,
-        ParseError.MissingRepeatOperand
-    );
+    , ParseError.MissingRepeatOperand);
 
     checkError(
         \\({5}
-    ,
-        ParseError.MissingRepeatOperand
-    );
+    , ParseError.MissingRepeatOperand);
 
     checkError(
         \\{5}
-    ,
-        ParseError.MissingRepeatOperand
-    );
+    , ParseError.MissingRepeatOperand);
 
     checkError(
         \\a**
-    ,
-        ParseError.MissingRepeatOperand
-    );
+    , ParseError.MissingRepeatOperand);
 
     checkError(
         \\a|*
-    ,
-        ParseError.MissingRepeatOperand
-    );
+    , ParseError.MissingRepeatOperand);
 
     checkError(
         \\a*{5}
-    ,
-        ParseError.MissingRepeatOperand
-    );
+    , ParseError.MissingRepeatOperand);
 
     checkError(
         \\a|{5}
-    ,
-        ParseError.MissingRepeatOperand
-    );
+    , ParseError.MissingRepeatOperand);
 
     checkError(
         \\a{}
-    ,
-        ParseError.InvalidRepeatArgument
-    );
+    , ParseError.InvalidRepeatArgument);
 
     checkError(
         \\a{5
-    ,
-        ParseError.UnclosedRepeat
-    );
+    , ParseError.UnclosedRepeat);
 
     checkError(
         \\a{xyz
-    ,
-        ParseError.InvalidRepeatArgument
-    );
+    , ParseError.InvalidRepeatArgument);
 
     checkError(
         \\a{12,xyz
-    ,
-        ParseError.InvalidRepeatArgument
-    );
+    , ParseError.InvalidRepeatArgument);
 
     checkError(
         \\a{999999999999}
-    ,
-        ParseError.ExcessiveRepeatCount
-    );
+    , ParseError.ExcessiveRepeatCount);
 
     checkError(
         \\a{1,999999999999}
-    ,
-        ParseError.ExcessiveRepeatCount
-    );
+    , ParseError.ExcessiveRepeatCount);
 
     checkError(
         \\a{12x}
-    ,
-        ParseError.UnclosedRepeat
-    );
+    , ParseError.UnclosedRepeat);
 
     checkError(
         \\a{1,12x}
-    ,
-        ParseError.UnclosedRepeat
-    );
+    , ParseError.UnclosedRepeat);
 }
 
 test "parse errors alternate" {
     checkError(
         \\|a
-    ,
-        ParseError.EmptyAlternate
-    );
+    , ParseError.EmptyAlternate);
 
     checkError(
         \\(|a)
-    ,
-        ParseError.EmptyAlternate
-    );
+    , ParseError.EmptyAlternate);
 
     checkError(
         \\a||
-    ,
-        ParseError.EmptyAlternate
-    );
+    , ParseError.EmptyAlternate);
 
     checkError(
         \\)
-    ,
-        ParseError.UnopenedParentheses
-    );
+    , ParseError.UnopenedParentheses);
 
     checkError(
         \\ab)
-    ,
-        ParseError.UnopenedParentheses
-    );
+    , ParseError.UnopenedParentheses);
 
     checkError(
         \\a|b)
-    ,
-        ParseError.UnopenedParentheses
-    );
+    , ParseError.UnopenedParentheses);
 
     checkError(
         \\(a|b
-    ,
-        ParseError.UnclosedParentheses
-    );
+    , ParseError.UnclosedParentheses);
 
     //checkError(
     //    \\(a|)
@@ -751,9 +690,7 @@ test "parse errors alternate" {
 
     checkError(
         \\ab(xy
-    ,
-        ParseError.UnclosedParentheses
-    );
+    , ParseError.UnclosedParentheses);
 
     //checkError(
     //    \\()
@@ -769,23 +706,11 @@ test "parse errors alternate" {
 }
 
 test "parse errors escape" {
-    checkError(
-        "\\"
-    ,
-        ParseError.OpenEscapeCode
-    );
+    checkError("\\", ParseError.OpenEscapeCode);
 
-    checkError(
-        "\\m"
-    ,
-        ParseError.UnrecognizedEscapeCode
-    );
+    checkError("\\m", ParseError.UnrecognizedEscapeCode);
 
-    checkError(
-        "\\x"
-    ,
-        ParseError.InvalidHexDigit
-    );
+    checkError("\\x", ParseError.InvalidHexDigit);
 
     //checkError(
     //    "\\xA"
@@ -799,91 +724,51 @@ test "parse errors escape" {
     //    ParseError.UnrecognizedEscapeCode
     //);
 
-    checkError(
-        "\\x{"
-    ,
-        ParseError.InvalidHexDigit
-    );
+    checkError("\\x{", ParseError.InvalidHexDigit);
 
-    checkError(
-        "\\x{A"
-    ,
-        ParseError.UnclosedHexCharacterCode
-    );
+    checkError("\\x{A", ParseError.UnclosedHexCharacterCode);
 
-    checkError(
-        "\\x{AG}"
-    ,
-        ParseError.UnclosedHexCharacterCode
-    );
+    checkError("\\x{AG}", ParseError.UnclosedHexCharacterCode);
 
-    checkError(
-        "\\x{D800}"
-    ,
-        ParseError.InvalidHexDigit
-    );
+    checkError("\\x{D800}", ParseError.InvalidHexDigit);
 
-    checkError(
-        "\\x{110000}"
-    ,
-        ParseError.InvalidHexDigit
-    );
+    checkError("\\x{110000}", ParseError.InvalidHexDigit);
 
-    checkError(
-        "\\x{99999999999999}"
-    ,
-        ParseError.InvalidHexDigit
-    );
+    checkError("\\x{99999999999999}", ParseError.InvalidHexDigit);
 }
 
 test "parse errors character class" {
     checkError(
         \\[
-    ,
-        ParseError.UnclosedBrackets
-    );
+    , ParseError.UnclosedBrackets);
 
     checkError(
         \\[^
-    ,
-        ParseError.UnclosedBrackets
-    );
+    , ParseError.UnclosedBrackets);
 
     checkError(
         \\[a
-    ,
-        ParseError.UnclosedBrackets
-    );
+    , ParseError.UnclosedBrackets);
 
     checkError(
         \\[^a
-    ,
-        ParseError.UnclosedBrackets
-    );
+    , ParseError.UnclosedBrackets);
 
     checkError(
         \\[a-
-    ,
-        ParseError.UnclosedBrackets
-    );
+    , ParseError.UnclosedBrackets);
 
     checkError(
         \\[^a-
-    ,
-        ParseError.UnclosedBrackets
-    );
+    , ParseError.UnclosedBrackets);
 
     checkError(
         \\[---
-    ,
-        ParseError.UnclosedBrackets
-    );
+    , ParseError.UnclosedBrackets);
 
     checkError(
         \\[\A]
-    ,
-        ParseError.UnrecognizedEscapeCode
-    );
+    , ParseError.UnrecognizedEscapeCode);
 
     //checkError(
     //    \\[a-\d]
@@ -899,9 +784,7 @@ test "parse errors character class" {
 
     checkError(
         \\[\A-a]
-    ,
-        ParseError.UnrecognizedEscapeCode
-    );
+    , ParseError.UnrecognizedEscapeCode);
 
     //checkError(
     //    \\[z-a]
@@ -911,15 +794,11 @@ test "parse errors character class" {
 
     checkError(
         \\[]
-    ,
-        ParseError.UnclosedBrackets
-    );
+    , ParseError.UnclosedBrackets);
 
     checkError(
         \\[^]
-    ,
-        ParseError.UnclosedBrackets
-    );
+    , ParseError.UnclosedBrackets);
 
     //checkError(
     //    \\[^\d\D]
