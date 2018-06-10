@@ -115,7 +115,7 @@ pub const VmBacktrack = struct {
 
             switch (inst.data) {
                 InstructionData.Char => |ch| {
-                    if (at == null or ??at != ch) {
+                    if (at == null or at.? != ch) {
                         return false;
                     }
                     input.advance();
@@ -126,13 +126,13 @@ pub const VmBacktrack = struct {
                     }
                 },
                 InstructionData.ByteClass => |class| {
-                    if (at == null or !class.contains(??at)) {
+                    if (at == null or !class.contains(at.?)) {
                         return false;
                     }
                     input.advance();
                 },
                 InstructionData.AnyCharNotNL => {
-                    if (at == null or ??at == '\n') {
+                    if (at == null or at.? == '\n') {
                         return false;
                     }
                     input.advance();

@@ -345,7 +345,7 @@ pub const Parser = struct {
                         else {
                             max = it.readInt(usize, 10) catch return error.InvalidRepeatArgument;
 
-                            if (??max < min) {
+                            if (max.? < min) {
                                 return error.InvalidRepeatRange;
                             }
                         }
@@ -359,7 +359,7 @@ pub const Parser = struct {
 
                     // We limit repeat counts to overoad arbitrary memory blowup during compilation
                     const limit = p.options.max_repeat_length;
-                    if (min > limit or max != null and ??max > limit) {
+                    if (min > limit or max != null and max.? > limit) {
                         return error.ExcessiveRepeatCount;
                     }
 
@@ -683,7 +683,7 @@ pub const Parser = struct {
                 return error.UnclosedBrackets;
             }
 
-            const chp = ??it.peek();
+            const chp = it.peek().?;
 
             // If this is a byte-class escape, we cannot expect an '-' range after it.
             // Accept the following - as a literal (may be bad behaviour).
@@ -725,7 +725,7 @@ pub const Parser = struct {
                     // treat the '-' as a literal instead
                     it.index -= 1;
                 } else {
-                    range.max = ??it.peek();
+                    range.max = it.peek().?;
                 }
             }
 
@@ -743,7 +743,7 @@ pub const Parser = struct {
     }
 
     fn parseEscape(p: *Parser) !*Expr {
-        const ch = p.it.next() ?? return error.OpenEscapeCode;
+        const ch = p.it.next() orelse return error.OpenEscapeCode;
 
         if (isPunctuation(ch)) {
             var r = try p.arena.allocator.create(Expr);

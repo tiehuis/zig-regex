@@ -91,7 +91,7 @@ pub const VmPike = struct {
 
                 switch (inst.data) {
                     InstructionData.Char => |ch| {
-                        if (at != null and ??at == ch) {
+                        if (at != null and at.? == ch) {
                             try nlist.append(Thread{
                                 .pc = inst.out,
                                 .slots = thread.slots,
@@ -107,7 +107,7 @@ pub const VmPike = struct {
                         }
                     },
                     InstructionData.ByteClass => |class| {
-                        if (at != null and class.contains(??at)) {
+                        if (at != null and class.contains(at.?)) {
                             try nlist.append(Thread{
                                 .pc = inst.out,
                                 .slots = thread.slots,
@@ -115,7 +115,7 @@ pub const VmPike = struct {
                         }
                     },
                     InstructionData.AnyCharNotNL => {
-                        if (at != null and ??at != '\n') {
+                        if (at != null and at.? != '\n') {
                             try nlist.append(Thread{
                                 .pc = inst.out,
                                 .slots = thread.slots,
@@ -126,11 +126,11 @@ pub const VmPike = struct {
                         // We always will have a complete capture in the 0, 1 index
                         if (matched) |last| {
                             // leftmost
-                            if (??thread.slots[0] > ??last[0]) {
+                            if (thread.slots[0].? > last[0].?) {
                                 continue;
                             }
                             // longest
-                            if (??thread.slots[1] - ??thread.slots[0] <= ??last[1] - ??last[0]) {
+                            if (thread.slots[1].? - thread.slots[0].? <= last[1].? - last[0].?) {
                                 continue;
                             }
                         }

@@ -26,7 +26,7 @@ fn nullableEql(comptime T: type, a: []const ?T, b: []const ?T) bool {
     var i: usize = 0;
     while (i < a.len) : (i += 1) {
         if (a[i] != null and b[i] != null) {
-            if (??a[i] != ??b[i]) {
+            if (a[i].? != b[i].?) {
                 return false;
             }
             // ok

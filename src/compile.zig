@@ -266,7 +266,7 @@ pub const Compiler = struct {
                     return c.compilePlus(repeat.subexpr, repeat.greedy);
                 }
                 // Case 3: ?
-                else if (repeat.min == 0 and repeat.max != null and (??repeat.max) == 1) {
+                else if (repeat.min == 0 and repeat.max != null and repeat.max.? == 1) {
                     return c.compileQuestion(repeat.subexpr, repeat.greedy);
                 }
                 // Case 4: {m,}
@@ -306,7 +306,7 @@ pub const Compiler = struct {
                     }
 
                     // repeated optional concatenations
-                    while (i < ??repeat.max) : (i += 1) {
+                    while (i < repeat.max.?) : (i += 1) {
                         const ep = try c.compileQuestion(repeat.subexpr, repeat.greedy);
                         c.fill(hole, ep.entry);
                         hole = ep.hole;

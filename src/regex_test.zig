@@ -121,6 +121,6 @@ test "regex captures" {
 
     const caps = if (try r.captures("xxxxab0123a")) |caps| caps else unreachable;
 
-    debug.assert(mem.eql(u8, "ab0123", ??caps.sliceAt(0)));
-    debug.assert(mem.eql(u8, "0123", ??caps.sliceAt(1)));
+    debug.assert(mem.eql(u8, "ab0123", caps.sliceAt(0).?));
+    debug.assert(mem.eql(u8, "0123", caps.sliceAt(1).?));
 }

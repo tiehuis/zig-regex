@@ -91,7 +91,7 @@ fn reprIndent(out: *StaticOutStream, e: *Expr, indent: usize) error!void {
                 try out.stream.print("*");
             } else if (repeat.min == 1 and repeat.max == null) {
                 try out.stream.print("+");
-            } else if (repeat.min == 0 and repeat.max != null and ??repeat.max == 1) {
+            } else if (repeat.min == 0 and repeat.max != null and repeat.max.? == 1) {
                 try out.stream.print("?");
             } else {
                 try out.stream.print("{{{},", repeat.min);

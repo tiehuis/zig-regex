@@ -125,7 +125,7 @@ pub const Captures = struct {
 
         if (base < self.slots.len) {
             if (self.slots[base]) |lower| {
-                const upper = ??self.slots[base + 1];
+                const upper = self.slots[base + 1].?;
                 return Span{
                     .lower = lower,
                     .upper = upper,
