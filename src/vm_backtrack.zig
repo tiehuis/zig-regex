@@ -183,7 +183,7 @@ pub const VmBacktrack = struct {
 
         const size = @sizeOf(BitsetType);
         const n = ip * (state.prog.insts.len + 1) + at;
-        const bitmask = BitsetType(1) << BitsetShiftType(n & (size - 1));
+        const bitmask = BitsetType(1) << @intCast(BitsetShiftType, n & (size - 1));
 
         if ((state.visited[n / size] & bitmask) != 0) {
             return false;

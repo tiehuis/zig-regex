@@ -47,7 +47,7 @@ pub fn RangeSet(comptime T: type) type {
         }
 
         // Add a range into the current class, preserving the structure invariants.
-        pub fn addRange(self: *Self, range: *const RangeType) !void {
+        pub fn addRange(self: *Self, range: RangeType) !void {
             var ranges = &self.ranges;
 
             if (ranges.len == 0) {
