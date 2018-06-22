@@ -375,9 +375,8 @@ pub const Compiler = struct {
                 errdefer holes.deinit();
 
                 // TODO: Why does this need to be dynamically allocated?
-                var last_hole = try c.allocator.create(Hole);
+                var last_hole = try c.allocator.create(Hole{ .None = undefined });
                 defer c.allocator.destroy(last_hole);
-                last_hole.* = Hole.None;
 
                 // This compiles one branch of the split at a time.
                 for (subexprs.toSliceConst()[0 .. subexprs.len - 1]) |subexpr| {
