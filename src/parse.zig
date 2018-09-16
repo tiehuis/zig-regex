@@ -97,7 +97,7 @@ fn charToDigit(c: u8, radix: u8) !u8 {
 }
 
 const StringIterator = struct {
-    const Self = this;
+    const Self = @This();
 
     slice: []const u8,
     index: usize,

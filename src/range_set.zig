@@ -1,5 +1,5 @@
 // A set of ordered disconnected non-empty ranges. These are stored in a flat array as opposed
-// to a tree structure. Insertions maintain order by rearranging as needed. Asymptotically this is
+// to a tree structure. Insertions maintain order by rearranging as needed. Asymptotically
 // worse than a tree range-set but given the size of the typical range-sets we work with this
 // implementation is undoubtedly quicker.
 
@@ -30,7 +30,7 @@ pub fn Range(comptime T: type) type {
 // A contiguous set of ranges which manages merging of sub-ranges and negation of the entire class.
 pub fn RangeSet(comptime T: type) type {
     return struct {
-        const Self = this;
+        const Self = @This();
         const RangeType = Range(T);
 
         // for any consecutive x, y in ranges, the following hold:

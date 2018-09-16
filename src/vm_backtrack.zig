@@ -52,7 +52,7 @@ const ExecState = struct {
 // This is bounded and only used for small compiled regexes. It is not quadratic since pre-seen
 // nodes are cached across threads.
 pub const VmBacktrack = struct {
-    const Self = this;
+    const Self = @This();
     allocator: *Allocator,
 
     pub fn init(allocator: *Allocator) Self {

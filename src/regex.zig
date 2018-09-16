@@ -87,7 +87,7 @@ pub const Span = struct {
 
 // A set of captures of a Regex on an input slice.
 pub const Captures = struct {
-    const Self = this;
+    const Self = @This();
 
     input: []const u8,
     allocator: *Allocator,

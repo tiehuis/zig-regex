@@ -28,7 +28,7 @@ const Thread = struct {
 };
 
 const ExecState = struct {
-    const Self = this;
+    const Self = @This();
 
     arena: ArenaAllocator,
     slot_count: usize,
@@ -58,7 +58,7 @@ const ExecState = struct {
 };
 
 pub const VmPike = struct {
-    const Self = this;
+    const Self = @This();
 
     allocator: *Allocator,
 
