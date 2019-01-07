@@ -63,7 +63,7 @@ fn repr(e: *Expr) ![]u8 {
     return global_buffer[0..stream.last];
 }
 
-fn reprIndent(out: *StaticOutStream, e: *Expr, indent: usize) error!void {
+fn reprIndent(out: *StaticOutStream, e: *Expr, indent: usize) anyerror!void {
     var i: usize = 0;
     while (i < indent) : (i += 1) {
         try out.stream.print(" ");

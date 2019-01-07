@@ -33,7 +33,7 @@ const ExecState = struct {
     arena: ArenaAllocator,
     slot_count: usize,
 
-    pub fn init(allocator: *Allocator, program: *const Program) Self {
+    pub fn init(allocator: *Allocator, program: Program) Self {
         return Self{
             .arena = ArenaAllocator.init(allocator),
             .slot_count = program.slot_count,
@@ -66,7 +66,7 @@ pub const VmPike = struct {
         return Self{ .allocator = allocator };
     }
 
-    pub fn exec(self: *Self, prog: *const Program, prog_start: usize, input: *Input, slots: *ArrayList(?usize)) !bool {
+    pub fn exec(self: *Self, prog: Program, prog_start: usize, input: *Input, slots: *ArrayList(?usize)) !bool {
         var clist = ArrayList(Thread).init(self.allocator);
         defer clist.deinit();
 

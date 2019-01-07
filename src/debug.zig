@@ -26,38 +26,38 @@ pub fn printCharEscaped(ch: u8) void {
     }
 }
 
-pub fn dumpExpr(e: *const Expr) void {
+pub fn dumpExpr(e: Expr) void {
     dumpExprIndent(e, 0);
 }
 
-fn dumpExprIndent(e: *const Expr, indent: usize) void {
+fn dumpExprIndent(e: Expr, indent: usize) void {
     var i: usize = 0;
     while (i < indent) : (i += 1) {
         debug.warn(" ");
     }
 
-    switch (e.*) {
+    switch (e) {
         Expr.AnyCharNotNL => {
-            debug.warn("{}\n", @tagName(e.*));
+            debug.warn("{}\n", @tagName(e));
         },
         Expr.EmptyMatch => |assertion| {
-            debug.warn("{}({})\n", @tagName(e.*), @tagName(assertion));
+            debug.warn("{}({})\n", @tagName(e), @tagName(assertion));
         },
         Expr.Literal => |lit| {
-            debug.warn("{}(", @tagName(e.*));
+            debug.warn("{}(", @tagName(e));
             printCharEscaped(lit);
             debug.warn(")\n");
         },
         Expr.Capture => |subexpr| {
-            debug.warn("{}\n", @tagName(e.*));
-            dumpExprIndent(subexpr, indent + 1);
+            debug.warn("{}\n", @tagName(e));
+            dumpExprIndent(subexpr.*, indent + 1);
         },
         Expr.Repeat => |repeat| {
-            debug.warn("{}(min={}, max={}, greedy={})\n", @tagName(e.*), repeat.min, repeat.max, repeat.greedy);
-            dumpExprIndent(repeat.subexpr, indent + 1);
+            debug.warn("{}(min={}, max={}, greedy={})\n", @tagName(e), repeat.min, repeat.max, repeat.greedy);
+            dumpExprIndent(repeat.subexpr.*, indent + 1);
         },
         Expr.ByteClass => |class| {
-            debug.warn("{}(", @tagName(e.*));
+            debug.warn("{}(", @tagName(e));
             for (class.ranges.toSliceConst()) |r| {
                 debug.warn("[");
                 printCharEscaped(r.min);
@@ -69,25 +69,25 @@ fn dumpExprIndent(e: *const Expr, indent: usize) void {
         },
         // TODO: Can we get better type unification on enum variants with the same type?
         Expr.Concat => |subexprs| {
-            debug.warn("{}\n", @tagName(e.*));
+            debug.warn("{}\n", @tagName(e));
             for (subexprs.toSliceConst()) |s|
-                dumpExprIndent(s, indent + 1);
+                dumpExprIndent(s.*, indent + 1);
         },
         Expr.Alternate => |subexprs| {
-            debug.warn("{}\n", @tagName(e.*));
+            debug.warn("{}\n", @tagName(e));
             for (subexprs.toSliceConst()) |s|
-                dumpExprIndent(s, indent + 1);
+                dumpExprIndent(s.*, indent + 1);
         },
         // NOTE: Shouldn't occur ever in returned output.
         Expr.PseudoLeftParen => {
-            debug.warn("{}\n", @tagName(e.*));
+            debug.warn("{}\n", @tagName(e));
         },
     }
 }
 
 use @import("compile.zig");
 
-pub fn dumpInstruction(s: *const Instruction) void {
+pub fn dumpInstruction(s: Instruction) void {
     switch (s.data) {
         InstructionData.Char => |ch| {
             debug.warn("char({}) '{c}'\n", s.out, ch);
@@ -119,7 +119,7 @@ pub fn dumpInstruction(s: *const Instruction) void {
     }
 }
 
-pub fn dumpProgram(s: *const Program) void {
+pub fn dumpProgram(s: Program) void {
     debug.warn("start: {}\n\n", s.start);
     for (s.insts) |inst, i| {
         debug.warn("L{}: ", i);

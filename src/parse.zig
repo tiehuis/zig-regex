@@ -1,6 +1,7 @@
 /// Parses a regular expression into an expression-tree. Uses a stack-based parser to avoid
 /// unbounded recursion.
 const std = @import("std");
+const math = std.math;
 const mem = std.mem;
 const fmt = std.fmt;
 const Allocator = std.mem.Allocator;
@@ -172,7 +173,7 @@ const StringIterator = struct {
     //
     // TODO: Non character word-boundary instead?
     pub fn readInt(it: *Self, comptime T: type, comptime radix: u8) !T {
-        return it.readIntN(T, radix, @maxValue(usize));
+        return it.readIntN(T, radix, math.maxInt(usize));
     }
 
     // Read an integer from the stream, limiting the read to N characters at most.
@@ -261,12 +262,12 @@ pub const Parser = struct {
         return initWithOptions(a, ParserOptions.default());
     }
 
-    pub fn initWithOptions(a: *Allocator, options: *const ParserOptions) Parser {
+    pub fn initWithOptions(a: *Allocator, options: ParserOptions) Parser {
         return Parser{
             .stack = ArrayList(*Expr).init(a),
             .arena = ArenaAllocator.init(a),
             .allocator = a,
-            .options = options.*,
+            .options = options,
             .it = undefined,
         };
     }

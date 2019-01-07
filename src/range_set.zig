@@ -71,7 +71,7 @@ pub fn RangeSet(comptime T: type) type {
 
             for (ranges.toSlice()[1..]) |r| {
                 // Overlap (or directly adjacent)
-                const upper = math.add(T, merge.max, 1) catch @maxValue(T);
+                const upper = math.add(T, merge.max, 1) catch math.maxInt(T);
                 if (r.min <= upper) {
                     merge.max = math.max(merge.max, r.max);
                 }
@@ -89,7 +89,7 @@ pub fn RangeSet(comptime T: type) type {
         }
 
         // Merge two classes into one.
-        pub fn mergeClass(self: *Self, other: *const Self) !void {
+        pub fn mergeClass(self: *Self, other: Self) !void {
             for (other.ranges.toSliceConst()) |r| {
                 try self.addRange(r);
             }
@@ -105,33 +105,33 @@ pub fn RangeSet(comptime T: type) type {
             var negated = ArrayList(RangeType).init(self.ranges.allocator);
 
             if (ranges.len == 0) {
-                try negated.append(RangeType.new(@minValue(T), @maxValue(T)));
+                try negated.append(RangeType.new(math.minInt(T), math.maxInt(T)));
                 mem.swap(ArrayList(RangeType), ranges, &negated);
                 negated.deinit();
                 return;
             }
 
-            var low: T = @minValue(T);
+            var low: T = math.minInt(T);
             for (ranges.toSliceConst()) |r| {
                 // NOTE: Can only occur on first element.
-                if (r.min != @minValue(T)) {
+                if (r.min != math.minInt(T)) {
                     try negated.append(RangeType.new(low, r.min - 1));
                 }
 
-                low = math.add(T, r.max, 1) catch @maxValue(T);
+                low = math.add(T, r.max, 1) catch math.maxInt(T);
             }
 
             // Highest segment will be remaining.
             const lastRange = ranges.at(ranges.len - 1);
-            if (lastRange.max != @maxValue(T)) {
-                try negated.append(RangeType.new(low, @maxValue(T)));
+            if (lastRange.max != math.maxInt(T)) {
+                try negated.append(RangeType.new(low, math.maxInt(T)));
             }
 
             mem.swap(ArrayList(RangeType), ranges, &negated);
             negated.deinit();
         }
 
-        pub fn contains(self: *const Self, value: T) bool {
+        pub fn contains(self: Self, value: T) bool {
             // TODO: Binary search required for large unicode sets.
             for (self.ranges.toSliceConst()) |range| {
                 if (range.min <= value and value <= range.max) {

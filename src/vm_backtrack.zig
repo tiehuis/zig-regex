@@ -59,11 +59,11 @@ pub const VmBacktrack = struct {
         return Self{ .allocator = allocator };
     }
 
-    fn shouldExec(prog: *const Program, input: *const Input) bool {
+    fn shouldExec(prog: Program, input: *const Input) bool {
         return (prog.insts.len + 1) * (input.bytes.len + 1) < ExecState.BitsetLen * @sizeOf(ExecState.BitsetType);
     }
 
-    pub fn exec(self: *Self, prog: *const Program, prog_start: usize, input: *Input, slots: *ArrayList(?usize)) !bool {
+    pub fn exec(self: *Self, prog: Program, prog_start: usize, input: *Input, slots: *ArrayList(?usize)) !bool {
         // Should never run this without first checking shouldExec and running only if true.
         debug.assert(shouldExec(prog, input));
 
@@ -73,7 +73,7 @@ pub const VmBacktrack = struct {
         var state = ExecState{
             .jobs = jobs,
             .visited = []u32{0} ** 512,
-            .prog = prog,
+            .prog = &prog,
             .slots = slots,
         };
 

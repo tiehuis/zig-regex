@@ -36,10 +36,10 @@ pub const Instruction = struct {
     // Associated data with this
     data: InstructionData,
 
-    pub fn new(out: usize, data: *const InstructionData) Instruction {
+    pub fn new(out: usize, data: InstructionData) Instruction {
         return Instruction{
             .out = out,
-            .data = data.*,
+            .data = data,
         };
     }
 };
@@ -380,7 +380,7 @@ pub const Compiler = struct {
 
                 // This compiles one branch of the split at a time.
                 for (subexprs.toSliceConst()[0 .. subexprs.len - 1]) |subexpr| {
-                    c.fillToNext(last_hole);
+                    c.fillToNext(last_hole.*);
 
                     // next entry will be a sub-expression
                     //
@@ -396,7 +396,7 @@ pub const Compiler = struct {
 
                 // one entry left, push a sub-expression so we end with a double-subexpression.
                 const p = try c.compileInternal(subexprs.toSliceConst()[subexprs.len - 1]);
-                c.fill(last_hole, p.entry);
+                c.fill(last_hole.*, p.entry);
 
                 // push the last sub-expression hole
                 try holes.append(p.hole);
@@ -497,20 +497,20 @@ pub const Compiler = struct {
     }
 
     // Push a compiled instruction directly onto the stack.
-    fn pushCompiled(c: *Compiler, i: *const Instruction) !void {
-        try c.insts.append(PartialInst{ .Compiled = i.* });
+    fn pushCompiled(c: *Compiler, i: Instruction) !void {
+        try c.insts.append(PartialInst{ .Compiled = i });
     }
 
     // Push a instruction with a hole onto the set
-    fn pushHole(c: *Compiler, i: *const InstHole) !Hole {
+    fn pushHole(c: *Compiler, i: InstHole) !Hole {
         const h = c.insts.len;
-        try c.insts.append(PartialInst{ .Uncompiled = i.* });
+        try c.insts.append(PartialInst{ .Uncompiled = i });
         return Hole{ .One = h };
     }
 
     // Patch an individual hole with the specified output address.
-    fn fill(c: *Compiler, hole: *const Hole, goto1: usize) void {
-        switch (hole.*) {
+    fn fill(c: *Compiler, hole: Hole, goto1: usize) void {
+        switch (hole) {
             Hole.None => {},
             Hole.One => |pc| c.insts.toSlice()[pc].fill(goto1),
             Hole.Many => |holes| {
@@ -521,7 +521,7 @@ pub const Compiler = struct {
     }
 
     // Patch a hole to point to the next instruction
-    fn fillToNext(c: *Compiler, hole: *const Hole) void {
+    fn fillToNext(c: *Compiler, hole: Hole) void {
         c.fill(hole, c.insts.len);
     }
 };
