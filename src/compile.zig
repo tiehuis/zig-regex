@@ -374,8 +374,8 @@ pub const Compiler = struct {
                 var holes = ArrayList(Hole).init(c.allocator);
                 errdefer holes.deinit();
 
-                // TODO: Why does this need to be dynamically allocated?
-                var last_hole = try c.allocator.create(Hole{ .None = undefined });
+                // TODO: Doees this need to be dynamically allocated?
+                var last_hole = try c.allocator.create(Hole);
                 defer c.allocator.destroy(last_hole);
 
                 // This compiles one branch of the split at a time.

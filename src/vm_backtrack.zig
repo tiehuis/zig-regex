@@ -59,7 +59,7 @@ pub const VmBacktrack = struct {
         return Self{ .allocator = allocator };
     }
 
-    fn shouldExec(prog: Program, input: *const Input) bool {
+    pub fn shouldExec(prog: Program, input: *const Input) bool {
         return (prog.insts.len + 1) * (input.bytes.len + 1) < ExecState.BitsetLen * @sizeOf(ExecState.BitsetType);
     }
 
