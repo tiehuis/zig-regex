@@ -147,7 +147,7 @@ fn check(re: []const u8, expected_ast: []const u8) void {
 
     var ast = repr(expr) catch unreachable;
 
-    const spaces = []const u8{ ' ', '\n' };
+    const spaces = [_]u8{ ' ', '\n' };
     const trimmed_ast = mem.trim(u8, ast, spaces);
     const trimmed_expected_ast = mem.trim(u8, expected_ast, spaces);
 
@@ -528,7 +528,7 @@ fn checkError(re: []const u8, expected_err: ParseError) void {
 
     if (parse_result) |expr| {
         const ast = repr(expr) catch unreachable;
-        const spaces = []const u8{ ' ', '\n' };
+        const spaces = [_]u8{ ' ', '\n' };
         const trimmed_ast = mem.trim(u8, ast, spaces);
 
         debug.warn(

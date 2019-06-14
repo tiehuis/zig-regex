@@ -228,7 +228,7 @@ pub const Compiler = struct {
         // 3: split 1, 4
         // 4: any 3
         const fragment_start = c.insts.len;
-        const fragment = []Instruction{
+        const fragment = [_]Instruction{
             Instruction.new(0, InstructionData{ .Split = fragment_start + 1 }),
             Instruction.new(fragment_start, InstructionData.AnyCharNotNL),
         };

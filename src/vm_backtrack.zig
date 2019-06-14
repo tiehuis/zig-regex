@@ -72,7 +72,7 @@ pub const VmBacktrack = struct {
 
         var state = ExecState{
             .jobs = jobs,
-            .visited = []u32{0} ** 512,
+            .visited = [_]u32{0} ** 512,
             .prog = &prog,
             .slots = slots,
         };
