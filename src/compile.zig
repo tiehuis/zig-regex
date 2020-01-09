@@ -232,7 +232,7 @@ pub const Compiler = struct {
             Instruction.new(0, InstructionData{ .Split = fragment_start + 1 }),
             Instruction.new(fragment_start, InstructionData.AnyCharNotNL),
         };
-        try p.appendSlice(fragment);
+        try p.appendSlice(&fragment);
 
         return Program.init(p.allocator, p.toOwnedSlice(), fragment_start, c.capture_index);
     }

@@ -22,11 +22,11 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
             \\String:   '{}'
             \\Expected: {}
             \\
-        ,
+        , .{
             re_input,
             to_match,
             expected,
-        );
+        });
 
         // Dump expression tree and bytecode
         var p = Parser.init(debug.global_allocator);
@@ -37,21 +37,21 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
             \\
             \\ -- Expression Tree ------------
             \\
-        );
+        , .{});
         re_debug.dumpExpr(expr.*);
 
         debug.warn(
             \\
             \\ -- Bytecode -------------------
             \\
-        );
+        , .{});
         re_debug.dumpProgram(re.compiled);
 
         debug.warn(
             \\
             \\ -------------------------------
             \\
-        );
+        , .{});
 
         @panic("assertion failure");
     }
