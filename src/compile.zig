@@ -356,7 +356,7 @@ pub const Compiler = struct {
             },
             Expr.Alternate => |subexprs| {
                 // Alternation with one path does not make sense
-                debug.assert(subexprs.len >= 2);
+                debug.assert(subexprs.items.len >= 2);
 
                 // Alternates are simply a series of splits into the sub-expressions, with each
                 // subexpr having the same output hole (after the final subexpr).
@@ -379,7 +379,7 @@ pub const Compiler = struct {
                 defer c.allocator.destroy(last_hole);
 
                 // This compiles one branch of the split at a time.
-                for (subexprs.toSliceConst()[0 .. subexprs.len - 1]) |subexpr| {
+                for (subexprs.items[0 .. subexprs.items.len - 1]) |subexpr| {
                     c.fillToNext(last_hole.*);
 
                     // next entry will be a sub-expression
@@ -395,7 +395,7 @@ pub const Compiler = struct {
                 }
 
                 // one entry left, push a sub-expression so we end with a double-subexpression.
-                const p = try c.compileInternal(subexprs.toSliceConst()[subexprs.len - 1]);
+                const p = try c.compileInternal(subexprs.items[subexprs.items.len - 1]);
                 c.fill(last_hole.*, p.entry);
 
                 // push the last sub-expression hole

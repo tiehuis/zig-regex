@@ -1,7 +1,6 @@
 const std = @import("std");
 const debug = std.debug;
 const mem = std.mem;
-const OutStream = std.io.OutStream;
 const FixedBufferAllocator = std.heap.FixedBufferAllocator;
 
 const parse = @import("parse.zig");
@@ -15,42 +14,44 @@ var global_buffer: [2048]u8 = undefined;
 const StaticOutStream = struct {
     buffer: []u8,
     last: usize,
-    stream: Stream,
-
-    pub const Error = error{OutOfMemory};
-    pub const Stream = OutStream(Error);
 
     pub fn init(buffer: []u8) StaticOutStream {
         return StaticOutStream{
             .buffer = buffer,
             .last = 0,
-            .stream = Stream{ .writeFn = writeFn },
         };
     }
 
-    fn writeFn(out_stream: *Stream, bytes: []const u8) Error!void {
-        const self = @fieldParentPtr(StaticOutStream, "stream", out_stream);
+    pub fn writeFn(self: *StaticOutStream, bytes: []const u8) Error!usize {
         mem.copy(u8, self.buffer[self.last..], bytes);
         self.last += bytes.len;
+        return bytes.len;
+    }
+
+    pub const Error = error{OutOfMemory};
+    pub const OutStream = std.io.OutStream(*StaticOutStream, Error, writeFn);
+
+    pub fn outStream(self: *StaticOutStream) OutStream {
+        return .{ .context = self };
     }
 
     pub fn printCharEscaped(self: *StaticOutStream, ch: u8) !void {
         switch (ch) {
             '\t' => {
-                try self.stream.print("\\t", .{});
+                try self.outStream().print("\\t", .{});
             },
             '\r' => {
-                try self.stream.print("\\r", .{});
+                try self.outStream().print("\\r", .{});
             },
             '\n' => {
-                try self.stream.print("\\n", .{});
+                try self.outStream().print("\\n", .{});
             },
             // printable characters
             32...126 => {
-                try self.stream.print("{c}", .{ ch });
+                try self.outStream().print("{c}", .{ ch });
             },
             else => {
-                try self.stream.print("0x{x}", .{ ch });
+                try self.outStream().print("0x{x}", .{ ch });
             },
         }
     }
@@ -66,73 +67,73 @@ fn repr(e: *Expr) ![]u8 {
 fn reprIndent(out: *StaticOutStream, e: *Expr, indent: usize) anyerror!void {
     var i: usize = 0;
     while (i < indent) : (i += 1) {
-        try out.stream.print(" ", .{});
+        try out.outStream().print(" ", .{});
     }
 
     switch (e.*) {
         Expr.AnyCharNotNL => {
-            try out.stream.print("dot\n", .{});
+            try out.outStream().print("dot\n", .{});
         },
         Expr.EmptyMatch => |assertion| {
-            try out.stream.print("empty({})\n", .{ @tagName(assertion) });
+            try out.outStream().print("empty({})\n", .{ @tagName(assertion) });
         },
         Expr.Literal => |lit| {
-            try out.stream.print("lit(", .{});
+            try out.outStream().print("lit(", .{});
             try out.printCharEscaped(lit);
-            try out.stream.print(")\n", .{});
+            try out.outStream().print(")\n", .{});
         },
         Expr.Capture => |subexpr| {
-            try out.stream.print("cap\n", .{});
+            try out.outStream().print("cap\n", .{});
             try reprIndent(out, subexpr, indent + 1);
         },
         Expr.Repeat => |repeat| {
-            try out.stream.print("rep(", .{});
+            try out.outStream().print("rep(", .{});
             if (repeat.min == 0 and repeat.max == null) {
-                try out.stream.print("*", .{});
+                try out.outStream().print("*", .{});
             } else if (repeat.min == 1 and repeat.max == null) {
-                try out.stream.print("+", .{});
+                try out.outStream().print("+", .{});
             } else if (repeat.min == 0 and repeat.max != null and repeat.max.? == 1) {
-                try out.stream.print("?", .{});
+                try out.outStream().print("?", .{});
             } else {
-                try out.stream.print("{{{},", .{ repeat.min });
+                try out.outStream().print("{{{},", .{ repeat.min });
                 if (repeat.max) |ok| {
-                    try out.stream.print("{}", .{ ok });
+                    try out.outStream().print("{}", .{ ok });
                 }
-                try out.stream.print("}}", .{});
+                try out.outStream().print("}}", .{});
             }
 
             if (!repeat.greedy) {
-                try out.stream.print("?", .{});
+                try out.outStream().print("?", .{});
             }
-            try out.stream.print(")\n", .{});
+            try out.outStream().print(")\n", .{});
 
             try reprIndent(out, repeat.subexpr, indent + 1);
         },
         Expr.ByteClass => |class| {
-            try out.stream.print("bset(", .{});
+            try out.outStream().print("bset(", .{});
             for (class.ranges.toSliceConst()) |r| {
-                try out.stream.print("[", .{});
+                try out.outStream().print("[", .{});
                 try out.printCharEscaped(r.min);
-                try out.stream.print("-", .{});
+                try out.outStream().print("-", .{});
                 try out.printCharEscaped(r.max);
-                try out.stream.print("]", .{});
+                try out.outStream().print("]", .{});
             }
-            try out.stream.print(")\n", .{});
+            try out.outStream().print(")\n", .{});
         },
         // TODO: Can we get better type unification on enum variants with the same type?
         Expr.Concat => |subexprs| {
-            try out.stream.print("cat\n", .{});
+            try out.outStream().print("cat\n", .{});
             for (subexprs.toSliceConst()) |s|
                 try reprIndent(out, s, indent + 1);
         },
         Expr.Alternate => |subexprs| {
-            try out.stream.print("alt\n", .{});
+            try out.outStream().print("alt\n", .{});
             for (subexprs.toSliceConst()) |s|
                 try reprIndent(out, s, indent + 1);
         },
         // NOTE: Shouldn't occur ever in returned output.
         Expr.PseudoLeftParen => {
-            try out.stream.print("{}\n", .{ @tagName(e.*) });
+            try out.outStream().print("{}\n", .{ @tagName(e.*) });
         },
     }
 }
