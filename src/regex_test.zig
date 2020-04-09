@@ -3,8 +3,9 @@ const debug = @import("std").debug;
 const Parser = @import("parse.zig").Parser;
 const re_debug = @import("debug.zig");
 
-const FixedBufferAllocator = @import("std").heap.FixedBufferAllocator;
-const mem = @import("std").mem;
+const std = @import("std");
+const FixedBufferAllocator = std.heap.FixedBufferAllocator;
+const mem = std.mem;
 
 // Debug global allocator is too small for our tests
 var buffer: [800000]u8 = undefined;
@@ -29,7 +30,7 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
         });
 
         // Dump expression tree and bytecode
-        var p = Parser.init(debug.global_allocator);
+        var p = Parser.init(std.testing.allocator);
         defer p.deinit();
         const expr = p.parse(re_input) catch unreachable;
 
@@ -115,7 +116,7 @@ test "regex sanity tests" {
 }
 
 test "regex captures" {
-    var r = Regex.compile(debug.global_allocator, "ab(\\d+)") catch unreachable;
+    var r = Regex.compile(std.testing.allocator, "ab(\\d+)") catch unreachable;
 
     debug.assert(try r.partialMatch("xxxxab0123a"));
 

@@ -523,7 +523,7 @@ test "parse character classes" {
 }
 
 fn checkError(re: []const u8, expected_err: ParseError) void {
-    var p = Parser.init(debug.global_allocator);
+    var p = Parser.init(std.testing.allocator);
     const parse_result = p.parse(re);
 
     if (parse_result) |expr| {
