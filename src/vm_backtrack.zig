@@ -88,8 +88,8 @@ pub const VmBacktrack = struct {
                     }
                 },
                 Job.SaveRestore => |save| {
-                    if (save.slot < state.slots.len) {
-                        state.slots.toSlice()[save.slot] = save.last_pos;
+                    if (save.slot < state.slots.items.len) {
+                        state.slots.items[save.slot] = save.last_pos;
                     }
                 },
             }
@@ -139,16 +139,16 @@ pub const VmBacktrack = struct {
                 },
                 InstructionData.Save => |slot| {
                     // Our capture array may not be long enough, extend and fill with empty
-                    while (state.slots.len <= slot) {
+                    while (state.slots.items.len <= slot) {
                         // TODO: Can't append null as optional
                         try state.slots.append(0);
-                        state.slots.toSlice()[state.slots.len - 1] = null;
+                        state.slots.items[state.slots.items.len - 1] = null;
                     }
 
                     // We can save an existing match by creating a job which will run on this thread
                     // failing. This will reset to the old match before any subsequent splits in
                     // this thread.
-                    if (state.slots.at(slot)) |last_pos| {
+                    if (state.slots.items[slot]) |last_pos| {
                         const job = Job{
                             .SaveRestore = SaveRestore{
                                 .slot = slot,
@@ -158,7 +158,7 @@ pub const VmBacktrack = struct {
                         try state.jobs.append(job);
                     }
 
-                    state.slots.toSlice()[slot] = input.byte_pos;
+                    state.slots.items[slot] = input.byte_pos;
                 },
                 InstructionData.Match => {
                     return true;
@@ -183,7 +183,7 @@ pub const VmBacktrack = struct {
 
         const size = @sizeOf(BitsetType);
         const n = ip * (state.prog.insts.len + 1) + at;
-        const bitmask = BitsetType(1) << @intCast(BitsetShiftType, n & (size - 1));
+        const bitmask = @intCast(BitsetType, 1) << @intCast(BitsetShiftType, n & (size - 1));
 
         if ((state.visited[n / size] & bitmask) != 0) {
             return false;

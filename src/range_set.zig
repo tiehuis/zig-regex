@@ -50,13 +50,13 @@ pub fn RangeSet(comptime T: type) type {
         pub fn addRange(self: *Self, range: RangeType) !void {
             var ranges = &self.ranges;
 
-            if (ranges.len == 0) {
+            if (ranges.items.len == 0) {
                 try ranges.append(range);
                 return;
             }
 
             // Insert range.
-            for (ranges.toSlice()) |r, i| {
+            for (ranges.items) |r, i| {
                 if (range.min <= r.min) {
                     try ranges.insert(i, range);
                     break;
@@ -67,9 +67,9 @@ pub fn RangeSet(comptime T: type) type {
 
             // Merge overlapping runs.
             var index: usize = 0;
-            var merge = ranges.at(0);
+            var merge = ranges.items[0];
 
-            for (ranges.toSlice()[1..]) |r| {
+            for (ranges.items[1..]) |r| {
                 // Overlap (or directly adjacent)
                 const upper = math.add(T, merge.max, 1) catch math.maxInt(T);
                 if (r.min <= upper) {
@@ -77,20 +77,20 @@ pub fn RangeSet(comptime T: type) type {
                 }
                 // No overlap
                 else {
-                    ranges.toSlice()[index] = merge;
+                    ranges.items[index] = merge;
                     merge = r;
                     index += 1;
                 }
             }
 
-            ranges.toSlice()[index] = merge;
+            ranges.items[index] = merge;
             index += 1;
             ranges.shrink(index);
         }
 
         // Merge two classes into one.
         pub fn mergeClass(self: *Self, other: Self) !void {
-            for (other.ranges.toSliceConst()) |r| {
+            for (other.ranges.items) |r| {
                 try self.addRange(r);
             }
         }
@@ -104,7 +104,7 @@ pub fn RangeSet(comptime T: type) type {
             // NOTE: Append to end of array then copy and shrink.
             var negated = ArrayList(RangeType).init(self.ranges.allocator);
 
-            if (ranges.len == 0) {
+            if (ranges.items.len == 0) {
                 try negated.append(RangeType.new(math.minInt(T), math.maxInt(T)));
                 mem.swap(ArrayList(RangeType), ranges, &negated);
                 negated.deinit();
@@ -112,7 +112,7 @@ pub fn RangeSet(comptime T: type) type {
             }
 
             var low: T = math.minInt(T);
-            for (ranges.toSliceConst()) |r| {
+            for (ranges.items) |r| {
                 // NOTE: Can only occur on first element.
                 if (r.min != math.minInt(T)) {
                     try negated.append(RangeType.new(low, r.min - 1));
@@ -122,7 +122,7 @@ pub fn RangeSet(comptime T: type) type {
             }
 
             // Highest segment will be remaining.
-            const lastRange = ranges.at(ranges.len - 1);
+            const lastRange = ranges.items[ranges.items.len - 1];
             if (lastRange.max != math.maxInt(T)) {
                 try negated.append(RangeType.new(low, math.maxInt(T)));
             }
@@ -133,7 +133,7 @@ pub fn RangeSet(comptime T: type) type {
 
         pub fn contains(self: Self, value: T) bool {
             // TODO: Binary search required for large unicode sets.
-            for (self.ranges.toSliceConst()) |range| {
+            for (self.ranges.items) |range| {
                 if (range.min <= value and value <= range.max) {
                     return true;
                 }
@@ -204,9 +204,8 @@ pub const ByteClassTemplates = struct {
     }
 };
 
-var alloc = debug.global_allocator;
-
 test "class simple" {
+    const alloc = std.testing.allocator;
     var a = RangeSet(u8).init(alloc);
     try a.addRange(Range(u8).new(0, 54));
 
@@ -217,6 +216,7 @@ test "class simple" {
 }
 
 test "class simple negate" {
+    const alloc = std.testing.allocator;
     var a = RangeSet(u8).init(alloc);
     try a.addRange(Range(u8).new(0, 54));
 
@@ -244,6 +244,7 @@ test "class simple negate" {
 }
 
 test "class multiple" {
+    const alloc = std.testing.allocator;
     var a = RangeSet(u8).init(alloc);
     try a.addRange(Range(u8).new(0, 20));
     try a.addRange(Range(u8).new(80, 100));
@@ -259,6 +260,7 @@ test "class multiple" {
 }
 
 test "class multiple negated" {
+    const alloc = std.testing.allocator;
     var a = RangeSet(u8).init(alloc);
     try a.addRange(Range(u8).new(0, 20));
     try a.addRange(Range(u8).new(80, 100));
@@ -294,6 +296,7 @@ test "class multiple negated" {
 }
 
 test "class out of order" {
+    const alloc = std.testing.allocator;
     var a = RangeSet(u8).init(alloc);
     try a.addRange(Range(u8).new(80, 100));
     try a.addRange(Range(u8).new(20, 30));
@@ -306,6 +309,7 @@ test "class out of order" {
 }
 
 test "class merging" {
+    const alloc = std.testing.allocator;
     var a = RangeSet(u8).init(alloc);
     try a.addRange(Range(u8).new(20, 100));
     try a.addRange(Range(u8).new(50, 80));
@@ -319,18 +323,20 @@ test "class merging" {
 }
 
 test "class merging boundary" {
+    const alloc = std.testing.allocator;
     var a = RangeSet(u8).init(alloc);
     try a.addRange(Range(u8).new(20, 40));
     try a.addRange(Range(u8).new(40, 60));
 
-    debug.assert(a.ranges.len == 1);
+    debug.assert(a.ranges.items.len == 1);
 }
 
 test "class merging adjacent" {
+    const alloc = std.testing.allocator;
     var a = RangeSet(u8).init(alloc);
     try a.addRange(Range(u8).new(56, 56));
     try a.addRange(Range(u8).new(57, 57));
     try a.addRange(Range(u8).new(58, 58));
 
-    debug.assert(a.ranges.len == 1);
+    debug.assert(a.ranges.items.len == 1);
 }

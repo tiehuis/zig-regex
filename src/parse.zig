@@ -286,7 +286,7 @@ pub const Parser = struct {
     }
 
     fn popStack(p: *Parser) !*Expr {
-        if (p.stack.len == 0) {
+        if (p.stack.items.len == 0) {
             return error.StackUnderflow;
         }
 
@@ -394,7 +394,7 @@ pub const Parser = struct {
 
                     while (true) {
                         // would underflow, push a new alternation
-                        if (p.stack.len == 0) {
+                        if (p.stack.items.len == 0) {
                             return error.UnopenedParentheses;
                         }
 
@@ -402,11 +402,11 @@ pub const Parser = struct {
                         switch (e.*) {
                             // Existing alternation
                             Expr.Alternate => {
-                                mem.reverse(*Expr, concat.toSlice());
+                                mem.reverse(*Expr, concat.items);
 
                                 var ra = try p.arena.allocator.create(Expr);
-                                if (concat.len == 1) {
-                                    ra.* = concat.toSliceConst()[0].*;
+                                if (concat.items.len == 1) {
+                                    ra.* = concat.items[0].*;
                                 } else {
                                     ra.* = Expr{ .Concat = concat };
                                 }
@@ -414,7 +414,7 @@ pub const Parser = struct {
                                 // append to the alternation stack
                                 try e.Alternate.append(ra);
 
-                                if (p.stack.len == 0) {
+                                if (p.stack.items.len == 0) {
                                     return error.UnopenedParentheses;
                                 }
 
@@ -428,15 +428,15 @@ pub const Parser = struct {
                             },
                             // Existing parentheses, push new alternation
                             Expr.PseudoLeftParen => {
-                                mem.reverse(*Expr, concat.toSlice());
+                                mem.reverse(*Expr, concat.items);
 
                                 var ra = try p.arena.allocator.create(Expr);
                                 ra.* = Expr{ .Concat = concat };
 
-                                if (concat.len == 0) {
+                                if (concat.items.len == 0) {
                                     return error.EmptyCaptureGroup;
-                                } else if (concat.len == 1) {
-                                    ra.* = concat.toSliceConst()[0].*;
+                                } else if (concat.items.len == 1) {
+                                    ra.* = concat.items[0].*;
                                 } else {
                                     ra.* = Expr{ .Concat = concat };
                                 }
@@ -461,19 +461,19 @@ pub const Parser = struct {
                     // - '|' is found, pop the existing and add a new alternation to the array.
                     var concat = ArrayList(*Expr).init(p.allocator);
 
-                    if (p.stack.len == 0 or !p.stack.at(p.stack.len - 1).isByteClass()) {
+                    if (p.stack.items.len == 0 or !p.stack.items[p.stack.items.len - 1].isByteClass()) {
                         return error.EmptyAlternate;
                     }
 
                     while (true) {
                         // would underflow, push a new alternation
-                        if (p.stack.len == 0) {
+                        if (p.stack.items.len == 0) {
                             // We need to create a single expr node for the alternation.
                             var ra = try p.arena.allocator.create(Expr);
-                            mem.reverse(*Expr, concat.toSlice());
+                            mem.reverse(*Expr, concat.items);
 
-                            if (concat.len == 1) {
-                                ra.* = concat.toSliceConst()[0].*;
+                            if (concat.items.len == 1) {
+                                ra.* = concat.items[0].*;
                             } else {
                                 ra.* = Expr{ .Concat = concat };
                             }
@@ -489,11 +489,11 @@ pub const Parser = struct {
                         switch (e.*) {
                             // Existing alternation, combine
                             Expr.Alternate => {
-                                mem.reverse(*Expr, concat.toSlice());
+                                mem.reverse(*Expr, concat.items);
 
                                 var ra = try p.arena.allocator.create(Expr);
-                                if (concat.len == 1) {
-                                    ra.* = concat.toSliceConst()[0].*;
+                                if (concat.items.len == 1) {
+                                    ra.* = concat.items[0].*;
                                 } else {
                                     ra.* = Expr{ .Concat = concat };
                                 }
@@ -509,11 +509,11 @@ pub const Parser = struct {
                                 // re-push parentheses marker
                                 try p.stack.append(e);
 
-                                mem.reverse(*Expr, concat.toSlice());
+                                mem.reverse(*Expr, concat.items);
 
                                 var ra = try p.arena.allocator.create(Expr);
-                                if (concat.len == 1) {
-                                    ra.* = concat.toSliceConst()[0].*;
+                                if (concat.items.len == 1) {
+                                    ra.* = concat.items[0].*;
                                 } else {
                                     ra.* = Expr{ .Concat = concat };
                                 }
@@ -552,14 +552,14 @@ pub const Parser = struct {
         }
 
         // special case empty item
-        if (p.stack.len == 0) {
+        if (p.stack.items.len == 0) {
             var r = try p.arena.allocator.create(Expr);
             r.* = Expr{ .EmptyMatch = Assertion.None };
             return r;
         }
 
         // special case single item to avoid top-level concat for simple.
-        if (p.stack.len == 1) {
+        if (p.stack.items.len == 1) {
             return p.stack.pop();
         }
 
@@ -577,13 +577,13 @@ pub const Parser = struct {
         var concat = ArrayList(*Expr).init(p.allocator);
 
         while (true) {
-            if (p.stack.len == 0) {
+            if (p.stack.items.len == 0) {
                 // concat the items in reverse order and return
-                mem.reverse(*Expr, concat.toSlice());
+                mem.reverse(*Expr, concat.items);
 
                 var r = try p.arena.allocator.create(Expr);
-                if (concat.len == 1) {
-                    r.* = concat.toSliceConst()[0].*;
+                if (concat.items.len == 1) {
+                    r.* = concat.items[0].*;
                 } else {
                     r.* = Expr{ .Concat = concat };
                 }
@@ -598,11 +598,11 @@ pub const Parser = struct {
                 },
                 // Alternation at top-level, push concat and return
                 Expr.Alternate => {
-                    mem.reverse(*Expr, concat.toSlice());
+                    mem.reverse(*Expr, concat.items);
 
                     var ra = try p.arena.allocator.create(Expr);
-                    if (concat.len == 1) {
-                        ra.* = concat.toSliceConst()[0].*;
+                    if (concat.items.len == 1) {
+                        ra.* = concat.items[0].*;
                     } else {
                         ra.* = Expr{ .Concat = concat };
                     }
@@ -611,7 +611,7 @@ pub const Parser = struct {
                     try e.Alternate.append(ra);
 
                     // if stack is not empty, this is an error
-                    if (p.stack.len != 0) {
+                    if (p.stack.items.len != 0) {
                         switch (p.stack.pop().*) {
                             Expr.PseudoLeftParen => return error.UnclosedParentheses,
                             else => unreachable,
