@@ -58,7 +58,7 @@ fn dumpExprIndent(e: Expr, indent: usize) void {
         },
         Expr.ByteClass => |class| {
             debug.warn("{}(", .{ @tagName(e) });
-            for (class.ranges.toSliceConst()) |r| {
+            for (class.ranges.items) |r| {
                 debug.warn("[", .{});
                 printCharEscaped(r.min);
                 debug.warn("-", .{});
@@ -70,12 +70,12 @@ fn dumpExprIndent(e: Expr, indent: usize) void {
         // TODO: Can we get better type unification on enum variants with the same type?
         Expr.Concat => |subexprs| {
             debug.warn("{}\n", .{ @tagName(e) });
-            for (subexprs.toSliceConst()) |s|
+            for (subexprs.items) |s|
                 dumpExprIndent(s.*, indent + 1);
         },
         Expr.Alternate => |subexprs| {
             debug.warn("{}\n", .{ @tagName(e) });
-            for (subexprs.toSliceConst()) |s|
+            for (subexprs.items) |s|
                 dumpExprIndent(s.*, indent + 1);
         },
         // NOTE: Shouldn't occur ever in returned output.
@@ -97,7 +97,7 @@ pub fn dumpInstruction(s: Instruction) void {
         },
         InstructionData.ByteClass => |class| {
             debug.warn("range({}) ", .{ s.out });
-            for (class.ranges.toSliceConst()) |r|
+            for (class.ranges.items) |r|
                 debug.warn("[{}-{}]", .{ r.min, r.max });
             debug.warn("\n", .{});
         },

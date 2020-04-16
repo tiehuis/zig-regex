@@ -317,7 +317,7 @@ pub const Compiler = struct {
             },
             Expr.Concat => |subexprs| {
                 // Compile each item in the sub-expression
-                var f = subexprs.toSliceConst()[0];
+                var f = subexprs.items[0];
 
                 // First patch
                 const p = try c.compileInternal(f);
@@ -325,7 +325,7 @@ pub const Compiler = struct {
                 const entry = p.entry;
 
                 // tie together patches from concat arguments
-                for (subexprs.toSliceConst()[1..]) |e| {
+                for (subexprs.items[1..]) |e| {
                     const ep = try c.compileInternal(e);
                     // fill the previous patch hole to the current entry
                     c.fill(hole, ep.entry);
@@ -514,7 +514,7 @@ pub const Compiler = struct {
             Hole.None => {},
             Hole.One => |pc| c.insts.items[pc].fill(goto1),
             Hole.Many => |holes| {
-                for (holes.toSliceConst()) |hole1|
+                for (holes.items) |hole1|
                     c.fill(hole1, goto1);
             },
         }
