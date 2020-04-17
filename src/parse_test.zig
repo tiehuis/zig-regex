@@ -111,7 +111,7 @@ fn reprIndent(out: *StaticOutStream, e: *Expr, indent: usize) anyerror!void {
         },
         Expr.ByteClass => |class| {
             try out.outStream().print("bset(", .{});
-            for (class.ranges.toSliceConst()) |r| {
+            for (class.ranges.items) |r| {
                 try out.outStream().print("[", .{});
                 try out.printCharEscaped(r.min);
                 try out.outStream().print("-", .{});
@@ -123,12 +123,12 @@ fn reprIndent(out: *StaticOutStream, e: *Expr, indent: usize) anyerror!void {
         // TODO: Can we get better type unification on enum variants with the same type?
         Expr.Concat => |subexprs| {
             try out.outStream().print("cat\n", .{});
-            for (subexprs.toSliceConst()) |s|
+            for (subexprs.items) |s|
                 try reprIndent(out, s, indent + 1);
         },
         Expr.Alternate => |subexprs| {
             try out.outStream().print("alt\n", .{});
-            for (subexprs.toSliceConst()) |s|
+            for (subexprs.items) |s|
                 try reprIndent(out, s, indent + 1);
         },
         // NOTE: Shouldn't occur ever in returned output.

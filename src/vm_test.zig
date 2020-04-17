@@ -55,7 +55,7 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
     var input2 = InputBytes.init(to_match).input;
     const backtrack_result = backtrack.exec(re.compiled, re.compiled.find_start, &input2, &backtrack_slots) catch unreachable;
 
-    const slots_equal = nullableEql(usize, pike_slots.toSliceConst(), backtrack_slots.toSliceConst());
+    const slots_equal = nullableEql(usize, pike_slots.items, backtrack_slots.items);
 
     // Note: slot entries are invalid on non-match
     if (pike_result != backtrack_result or (expected == true and !slots_equal)) {
@@ -76,7 +76,7 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
             \\pikevm
             \\
         , .{});
-        for (pike_slots.toSliceConst()) |entry| {
+        for (pike_slots.items) |entry| {
             debug.warn("{} ", .{ entry });
         }
         debug.warn("\n", .{});
@@ -87,7 +87,7 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
             \\backtrack
             \\
         , .{});
-        for (backtrack_slots.toSliceConst()) |entry| {
+        for (backtrack_slots.items) |entry| {
             debug.warn("{} ", .{ entry });
         }
         debug.warn("\n", .{});
