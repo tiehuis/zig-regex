@@ -377,6 +377,7 @@ pub const Compiler = struct {
                 // TODO: Doees this need to be dynamically allocated?
                 var last_hole = try c.allocator.create(Hole);
                 defer c.allocator.destroy(last_hole);
+                last_hole.* = .None;
 
                 // This compiles one branch of the split at a time.
                 for (subexprs.items[0 .. subexprs.items.len - 1]) |subexpr| {
