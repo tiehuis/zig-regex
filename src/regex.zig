@@ -49,6 +49,7 @@ pub const Regex = struct {
     }
 
     pub fn deinit(re: *Regex) void {
+        re.slots.deinit();
         re.compiled.deinit();
     }
 
@@ -72,7 +73,7 @@ pub const Regex = struct {
         const is_match = try exec.exec(re.allocator, re.compiled, re.compiled.find_start, &input_bytes.input, &re.slots);
 
         if (is_match) {
-            return Captures.init(input_str, &re.slots);
+            return try Captures.init(input_str, &re.slots);
         } else {
             return null;
         }
@@ -93,11 +94,11 @@ pub const Captures = struct {
     allocator: *Allocator,
     slots: []const ?usize,
 
-    pub fn init(input: []const u8, slots: *ArrayList(?usize)) Captures {
+    pub fn init(input: []const u8, slots: *ArrayList(?usize)) !Captures {
         return Captures{
             .input = input,
             .allocator = slots.allocator,
-            .slots = slots.toOwnedSlice(),
+            .slots = try slots.allocator.dupe(?usize, slots.span()),
         };
     }
 

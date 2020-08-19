@@ -116,7 +116,7 @@ const PartialInst = union(enum) {
 // A program represents the compiled bytecode of an NFA.
 pub const Program = struct {
     // Sequence of instructions representing an NFA
-    insts: []const Instruction,
+    insts: []Instruction,
     // Start instruction
     start: usize,
     // Find Start instruction
@@ -126,7 +126,7 @@ pub const Program = struct {
     // Allocator which owns the instructions
     allocator: *Allocator,
 
-    pub fn init(allocator: *Allocator, a: []const Instruction, find_start: usize, slot_count: usize) Program {
+    pub fn init(allocator: *Allocator, a: []Instruction, find_start: usize, slot_count: usize) Program {
         return Program{
             .allocator = allocator,
             .insts = a,
@@ -137,6 +137,14 @@ pub const Program = struct {
     }
 
     pub fn deinit(p: *Program) void {
+        for (p.insts) |*inst| {
+            switch (inst.data) {
+                .ByteClass => |*bc| {
+                    bc.deinit();
+                },
+                else => {},
+            }
+        }
         p.allocator.free(p.insts);
     }
 };

@@ -524,7 +524,9 @@ test "parse character classes" {
 }
 
 fn checkError(re: []const u8, expected_err: ParseError) void {
-    var p = Parser.init(std.testing.allocator);
+    var a = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer a.deinit();
+    var p = Parser.init(&a.allocator);
     const parse_result = p.parse(re);
 
     if (parse_result) |expr| {
