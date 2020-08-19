@@ -207,6 +207,7 @@ pub const ByteClassTemplates = struct {
 test "class simple" {
     const alloc = std.testing.allocator;
     var a = RangeSet(u8).init(alloc);
+    defer a.deinit();
     try a.addRange(Range(u8).new(0, 54));
 
     debug.assert(a.contains(0));
@@ -218,6 +219,7 @@ test "class simple" {
 test "class simple negate" {
     const alloc = std.testing.allocator;
     var a = RangeSet(u8).init(alloc);
+    defer a.deinit();
     try a.addRange(Range(u8).new(0, 54));
 
     debug.assert(a.contains(0));
@@ -246,6 +248,7 @@ test "class simple negate" {
 test "class multiple" {
     const alloc = std.testing.allocator;
     var a = RangeSet(u8).init(alloc);
+    defer a.deinit();
     try a.addRange(Range(u8).new(0, 20));
     try a.addRange(Range(u8).new(80, 100));
     try a.addRange(Range(u8).new(230, 255));
@@ -262,6 +265,7 @@ test "class multiple" {
 test "class multiple negated" {
     const alloc = std.testing.allocator;
     var a = RangeSet(u8).init(alloc);
+    defer a.deinit();
     try a.addRange(Range(u8).new(0, 20));
     try a.addRange(Range(u8).new(80, 100));
     try a.addRange(Range(u8).new(230, 255));
@@ -298,6 +302,7 @@ test "class multiple negated" {
 test "class out of order" {
     const alloc = std.testing.allocator;
     var a = RangeSet(u8).init(alloc);
+    defer a.deinit();
     try a.addRange(Range(u8).new(80, 100));
     try a.addRange(Range(u8).new(20, 30));
 
@@ -311,6 +316,7 @@ test "class out of order" {
 test "class merging" {
     const alloc = std.testing.allocator;
     var a = RangeSet(u8).init(alloc);
+    defer a.deinit();
     try a.addRange(Range(u8).new(20, 100));
     try a.addRange(Range(u8).new(50, 80));
     try a.addRange(Range(u8).new(50, 140));
@@ -325,6 +331,7 @@ test "class merging" {
 test "class merging boundary" {
     const alloc = std.testing.allocator;
     var a = RangeSet(u8).init(alloc);
+    defer a.deinit();
     try a.addRange(Range(u8).new(20, 40));
     try a.addRange(Range(u8).new(40, 60));
 
@@ -334,6 +341,7 @@ test "class merging boundary" {
 test "class merging adjacent" {
     const alloc = std.testing.allocator;
     var a = RangeSet(u8).init(alloc);
+    defer a.deinit();
     try a.addRange(Range(u8).new(56, 56));
     try a.addRange(Range(u8).new(57, 57));
     try a.addRange(Range(u8).new(58, 58));

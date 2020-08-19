@@ -116,11 +116,13 @@ test "regex sanity tests" {
 }
 
 test "regex captures" {
-    var r = Regex.compile(std.testing.allocator, "ab(\\d+)") catch unreachable;
+    var r = try Regex.compile(std.testing.allocator, "ab(\\d+)");
+    defer r.deinit();
 
     debug.assert(try r.partialMatch("xxxxab0123a"));
 
-    const caps = if (try r.captures("xxxxab0123a")) |caps| caps else unreachable;
+    var caps = (try r.captures("xxxxab0123a")).?;
+    defer caps.deinit();
 
     debug.assert(mem.eql(u8, "ab0123", caps.sliceAt(0).?));
     debug.assert(mem.eql(u8, "0123", caps.sliceAt(1).?));

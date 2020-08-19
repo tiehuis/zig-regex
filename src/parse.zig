@@ -390,7 +390,7 @@ pub const Parser = struct {
                     //   after which must be a opening parenthesis.
                     //
                     // '|' ensures there will be only one alternation on the stack here.
-                    var concat = ArrayList(*Expr).init(p.allocator);
+                    var concat = ArrayList(*Expr).init(&p.arena.allocator);
 
                     while (true) {
                         // would underflow, push a new alternation
@@ -574,7 +574,7 @@ pub const Parser = struct {
         // After any of these cases, the stack must be empty.
         //
         // There can be no parentheses left on the stack during this popping.
-        var concat = ArrayList(*Expr).init(p.allocator);
+        var concat = ArrayList(*Expr).init(&p.arena.allocator);
 
         while (true) {
             if (p.stack.items.len == 0) {
@@ -660,6 +660,7 @@ pub const Parser = struct {
         var it = &p.it;
 
         var class = ByteClass.init(p.allocator);
+        errdefer class.deinit();
 
         var negate = false;
         if (it.peekIs('^')) {

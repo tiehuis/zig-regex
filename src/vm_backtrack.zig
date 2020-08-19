@@ -67,15 +67,13 @@ pub const VmBacktrack = struct {
         // Should never run this without first checking shouldExec and running only if true.
         debug.assert(shouldExec(prog, input));
 
-        var jobs = ArrayList(Job).init(self.allocator);
-        defer jobs.deinit();
-
         var state = ExecState{
-            .jobs = jobs,
+            .jobs = ArrayList(Job).init(self.allocator),
             .visited = [_]u32{0} ** 512,
             .prog = &prog,
             .slots = slots,
         };
+        defer state.jobs.deinit();
 
         const t = Job{ .Thread = Thread{ .ip = prog_start, .input = input.clone() } };
         try state.jobs.append(t);
