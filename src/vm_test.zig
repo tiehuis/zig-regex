@@ -186,4 +186,5 @@ test "pikevm == backtrackvm" {
     check("[^\\w][^-1-4]", "!.", true);
     check("[^\\w][^-1-4]", " x", true);
     check("[^\\w][^-1-4]", "$b", true);
+    check("a{3,}", "aaa", true);
 }
