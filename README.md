@@ -10,7 +10,7 @@ Note: This is still a work in progress and many things still need to be done.
 
 ## Usage
 
-```
+```zig
 const debug = @import("std").debug;
 const Regex = @import("regex.zig").Regex;
 
@@ -25,7 +25,7 @@ test "example" {
 
 ### Regex
 
-```
+```zig
 fn compile(a: &Allocator, re: []const u8) !Regex
 ```
 
@@ -33,7 +33,7 @@ Compiles a regex string, returning any errors during parsing/compiling.
 
 ---
 
-```
+```zig
 pub fn match(re: &const Regex, input: []const u8) !bool
 ```
 
@@ -42,7 +42,7 @@ entirety and from the first index.
 
 ---
 
-```
+```zig
 pub fn partialMatch(re: &const Regex, input: []const u8) !bool
 ```
 
@@ -51,7 +51,7 @@ leftmost and does not have to be anchored to the start of `input`.
 
 ---
 
-```
+```zig
 pub fn captures(re: &const Regex, input: []const u8) !?Captures
 ```
 
@@ -62,14 +62,14 @@ If no match was found, null is returned.
 
 ### Captures
 
-```
+```zig
 pub fn sliceAt(captures: &const Captures, n: usize) ?[]const u8
 ```
 
 Return the sub-slice for the numbered capture group. 0 refers to the entire
 match.
 
-```
+```zig
 pub fn boundsAt(captures: &const Captures, n: usize) ?Span
 ```
 
@@ -77,7 +77,7 @@ Return the lower and upper byte positions for the specified capture group.
 
 We can retrieve the sub-slice using this function:
 
-```
+```zig
 const span = caps.boundsAt(0)
 debug.assert(mem.eql(u8, caps.sliceAt(0), input[span.lower..span.upper]));
 ```
