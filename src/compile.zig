@@ -272,13 +272,12 @@ pub const Compiler = struct {
                 // Case 4: {m,}
                 else if (repeat.max == null) {
                     // e{2,} => eee*
-
                     // fixed min concatenation
                     const p = try c.compileInternal(repeat.subexpr);
                     var hole = p.hole;
                     const entry = p.entry;
 
-                    var i: usize = 0;
+                    var i: usize = 1;
                     while (i < repeat.min) : (i += 1) {
                         const ep = try c.compileInternal(repeat.subexpr);
                         c.fill(hole, ep.entry);
