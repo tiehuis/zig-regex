@@ -159,9 +159,9 @@ test "pikevm == backtrackvm" {
     check("[.2]", "1C2", true);
     check("a*$", "Xaa", true);
     check("a*$", "Xaa", true);
-    //check("[a-h]+", "abcdefghxxx", true); // TODO: 0-8 in backtrack vs. 0-7 in backtrack
+    check("[a-h]+", "abcdefghxxx", true);
     check("[a-h]+", "ABCDEFGH", false);
-    //check("[A-H]+", "ABCDEFGH", true);
+    check("[A-H]+", "ABCDEFGH", true);
     check("[A-H]+", "abcdefgh", false);
     check("[^\\s]+", "abc def", true);
     check("[^fc]+", "abc def", true);
