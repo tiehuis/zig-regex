@@ -77,7 +77,7 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
             \\
         , .{});
         for (pike_slots.items) |entry| {
-            debug.warn("{} ", .{ entry });
+            debug.warn("{} ", .{entry});
         }
         debug.warn("\n", .{});
 
@@ -88,7 +88,7 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
             \\
         , .{});
         for (backtrack_slots.items) |entry| {
-            debug.warn("{} ", .{ entry });
+            debug.warn("{} ", .{entry});
         }
         debug.warn("\n", .{});
 
@@ -159,9 +159,9 @@ test "pikevm == backtrackvm" {
     check("[.2]", "1C2", true);
     check("a*$", "Xaa", true);
     check("a*$", "Xaa", true);
-    //check("[a-h]+", "abcdefghxxx", true); // TODO: 0-8 in backtrack vs. 0-7 in backtrack
+    check("[a-h]+", "abcdefghxxx", true);
     check("[a-h]+", "ABCDEFGH", false);
-    //check("[A-H]+", "ABCDEFGH", true);
+    check("[A-H]+", "ABCDEFGH", true);
     check("[A-H]+", "abcdefgh", false);
     check("[^\\s]+", "abc def", true);
     check("[^fc]+", "abc def", true);
@@ -187,4 +187,5 @@ test "pikevm == backtrackvm" {
     check("[^\\w][^-1-4]", " x", true);
     check("[^\\w][^-1-4]", "$b", true);
     check("a{3,}", "aaa", true);
+    check(".*emacs.*", "emacs-packages.nix", true);
 }
