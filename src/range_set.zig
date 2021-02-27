@@ -85,7 +85,7 @@ pub fn RangeSet(comptime T: type) type {
 
             ranges.items[index] = merge;
             index += 1;
-            ranges.shrink(index);
+            ranges.shrinkRetainingCapacity(index);
         }
 
         // Merge two classes into one.

@@ -11,47 +11,47 @@ const ParseError = parse.ParseError;
 // Note: Switch to OutStream
 var global_buffer: [2048]u8 = undefined;
 
-const StaticOutStream = struct {
+const StaticWriter = struct {
     buffer: []u8,
     last: usize,
 
-    pub fn init(buffer: []u8) StaticOutStream {
-        return StaticOutStream{
+    pub fn init(buffer: []u8) StaticWriter {
+        return StaticWriter{
             .buffer = buffer,
             .last = 0,
         };
     }
 
-    pub fn writeFn(self: *StaticOutStream, bytes: []const u8) Error!usize {
+    pub fn writeFn(self: *StaticWriter, bytes: []const u8) Error!usize {
         mem.copy(u8, self.buffer[self.last..], bytes);
         self.last += bytes.len;
         return bytes.len;
     }
 
     pub const Error = error{OutOfMemory};
-    pub const OutStream = std.io.OutStream(*StaticOutStream, Error, writeFn);
+    pub const Writer = std.io.Writer(*StaticWriter, Error, writeFn);
 
-    pub fn outStream(self: *StaticOutStream) OutStream {
+    pub fn writer(self: *StaticWriter) Writer {
         return .{ .context = self };
     }
 
-    pub fn printCharEscaped(self: *StaticOutStream, ch: u8) !void {
+    pub fn printCharEscaped(self: *StaticWriter, ch: u8) !void {
         switch (ch) {
             '\t' => {
-                try self.outStream().print("\\t", .{});
+                try self.writer().print("\\t", .{});
             },
             '\r' => {
-                try self.outStream().print("\\r", .{});
+                try self.writer().print("\\r", .{});
             },
             '\n' => {
-                try self.outStream().print("\\n", .{});
+                try self.writer().print("\\n", .{});
             },
             // printable characters
             32...126 => {
-                try self.outStream().print("{c}", .{ ch });
+                try self.writer().print("{c}", .{ch});
             },
             else => {
-                try self.outStream().print("0x{x}", .{ ch });
+                try self.writer().print("0x{x}", .{ch});
             },
         }
     }
@@ -59,81 +59,81 @@ const StaticOutStream = struct {
 
 // Return a minimal string representation of the expression tree.
 fn repr(e: *Expr) ![]u8 {
-    var stream = StaticOutStream.init(global_buffer[0..]);
+    var stream = StaticWriter.init(global_buffer[0..]);
     try reprIndent(&stream, e, 0);
     return global_buffer[0..stream.last];
 }
 
-fn reprIndent(out: *StaticOutStream, e: *Expr, indent: usize) anyerror!void {
+fn reprIndent(out: *StaticWriter, e: *Expr, indent: usize) anyerror!void {
     var i: usize = 0;
     while (i < indent) : (i += 1) {
-        try out.outStream().print(" ", .{});
+        try out.writer().print(" ", .{});
     }
 
     switch (e.*) {
         Expr.AnyCharNotNL => {
-            try out.outStream().print("dot\n", .{});
+            try out.writer().print("dot\n", .{});
         },
         Expr.EmptyMatch => |assertion| {
-            try out.outStream().print("empty({})\n", .{ @tagName(assertion) });
+            try out.writer().print("empty({s})\n", .{@tagName(assertion)});
         },
         Expr.Literal => |lit| {
-            try out.outStream().print("lit(", .{});
+            try out.writer().print("lit(", .{});
             try out.printCharEscaped(lit);
-            try out.outStream().print(")\n", .{});
+            try out.writer().print(")\n", .{});
         },
         Expr.Capture => |subexpr| {
-            try out.outStream().print("cap\n", .{});
+            try out.writer().print("cap\n", .{});
             try reprIndent(out, subexpr, indent + 1);
         },
         Expr.Repeat => |repeat| {
-            try out.outStream().print("rep(", .{});
+            try out.writer().print("rep(", .{});
             if (repeat.min == 0 and repeat.max == null) {
-                try out.outStream().print("*", .{});
+                try out.writer().print("*", .{});
             } else if (repeat.min == 1 and repeat.max == null) {
-                try out.outStream().print("+", .{});
+                try out.writer().print("+", .{});
             } else if (repeat.min == 0 and repeat.max != null and repeat.max.? == 1) {
-                try out.outStream().print("?", .{});
+                try out.writer().print("?", .{});
             } else {
-                try out.outStream().print("{{{},", .{ repeat.min });
+                try out.writer().print("{{{d},", .{repeat.min});
                 if (repeat.max) |ok| {
-                    try out.outStream().print("{}", .{ ok });
+                    try out.writer().print("{d}", .{ok});
                 }
-                try out.outStream().print("}}", .{});
+                try out.writer().print("}}", .{});
             }
 
             if (!repeat.greedy) {
-                try out.outStream().print("?", .{});
+                try out.writer().print("?", .{});
             }
-            try out.outStream().print(")\n", .{});
+            try out.writer().print(")\n", .{});
 
             try reprIndent(out, repeat.subexpr, indent + 1);
         },
         Expr.ByteClass => |class| {
-            try out.outStream().print("bset(", .{});
+            try out.writer().print("bset(", .{});
             for (class.ranges.items) |r| {
-                try out.outStream().print("[", .{});
+                try out.writer().print("[", .{});
                 try out.printCharEscaped(r.min);
-                try out.outStream().print("-", .{});
+                try out.writer().print("-", .{});
                 try out.printCharEscaped(r.max);
-                try out.outStream().print("]", .{});
+                try out.writer().print("]", .{});
             }
-            try out.outStream().print(")\n", .{});
+            try out.writer().print(")\n", .{});
         },
         // TODO: Can we get better type unification on enum variants with the same type?
         Expr.Concat => |subexprs| {
-            try out.outStream().print("cat\n", .{});
+            try out.writer().print("cat\n", .{});
             for (subexprs.items) |s|
                 try reprIndent(out, s, indent + 1);
         },
         Expr.Alternate => |subexprs| {
-            try out.outStream().print("alt\n", .{});
+            try out.writer().print("alt\n", .{});
             for (subexprs.items) |s|
                 try reprIndent(out, s, indent + 1);
         },
         // NOTE: Shouldn't occur ever in returned output.
         Expr.PseudoLeftParen => {
-            try out.outStream().print("{}\n", .{ @tagName(e.*) });
+            try out.writer().print("{s}\n", .{@tagName(e.*)});
         },
     }
 }
@@ -157,15 +157,15 @@ fn check(re: []const u8, expected_ast: []const u8) void {
             \\
             \\-- parsed the regex
             \\
-            \\{}
+            \\{s}
             \\
             \\-- expected the following
             \\
-            \\{}
+            \\{s}
             \\
             \\-- but instead got
             \\
-            \\{}
+            \\{s}
             \\
         , .{
             re,
@@ -536,15 +536,15 @@ fn checkError(re: []const u8, expected_err: ParseError) void {
             \\
             \\-- parsed the regex
             \\
-            \\{}
+            \\{s}
             \\
             \\-- expected the following
             \\
-            \\{}
+            \\{s}
             \\
             \\-- but instead got
             \\
-            \\{}
+            \\{s}
             \\
             \\
         , .{
@@ -560,15 +560,15 @@ fn checkError(re: []const u8, expected_err: ParseError) void {
                 \\
                 \\-- parsed the regex
                 \\
-                \\{}
+                \\{s}
                 \\
                 \\-- expected the following
                 \\
-                \\{}
+                \\{s}
                 \\
                 \\-- but instead got
                 \\
-                \\{}
+                \\{s}
                 \\
                 \\
             , .{

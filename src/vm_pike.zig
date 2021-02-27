@@ -174,11 +174,11 @@ pub const VmPike = struct {
             }
 
             mem.swap(ArrayList(Thread), &clist, &nlist);
-            nlist.shrink(0);
+            nlist.shrinkRetainingCapacity(0);
         }
 
         if (matched) |ok_matched| {
-            slots.shrink(0);
+            slots.shrinkAndFree(0);
             try slots.appendSlice(ok_matched);
             return true;
         }

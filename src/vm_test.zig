@@ -64,8 +64,8 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
             \\ -- Failure! ----------------
             \\
             \\
-            \\pikevm:    {}
-            \\backtrack: {}
+            \\pikevm:    {s}
+            \\backtrack: {s}
             \\
         , .{ pike_result, backtrack_result });
 
@@ -77,7 +77,7 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
             \\
         , .{});
         for (pike_slots.items) |entry| {
-            debug.warn("{} ", .{entry});
+            debug.warn("{d} ", .{entry});
         }
         debug.warn("\n", .{});
 
@@ -88,7 +88,7 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
             \\
         , .{});
         for (backtrack_slots.items) |entry| {
-            debug.warn("{} ", .{entry});
+            debug.warn("{d} ", .{entry});
         }
         debug.warn("\n", .{});
 
@@ -96,9 +96,9 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
             \\
             \\ -- Regex ------------------
             \\
-            \\Regex:    '{}'
-            \\String:   '{}'
-            \\Expected: {}
+            \\Regex:    '{s}'
+            \\String:   '{s}'
+            \\Expected: {s}
             \\
         , .{ re_input, to_match, expected });
 
