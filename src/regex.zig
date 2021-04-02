@@ -98,7 +98,7 @@ pub const Captures = struct {
         return Captures{
             .input = input,
             .allocator = slots.allocator,
-            .slots = try slots.allocator.dupe(?usize, slots.span()),
+            .slots = try slots.allocator.dupe(?usize, slots.items),
         };
     }
 
