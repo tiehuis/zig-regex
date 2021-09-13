@@ -77,8 +77,6 @@ const PartialInst = union(enum) {
     pub fn fill(s: *PartialInst, i: usize) void {
         switch (s.*) {
             PartialInst.Uncompiled => |ih| {
-                var comp: Instruction = undefined;
-
                 // Generate the corresponding compiled instruction. All simply goto the specified
                 // instruction, except for the dual split case, in which both outgoing pointers
                 // go to the same place.
@@ -219,7 +217,7 @@ pub const Compiler = struct {
                 PartialInst.Compiled => |x| {
                     try p.append(x);
                 },
-                else => |inner| {
+                else => |_| {
                     @panic("uncompiled instruction encountered during compilation");
                 },
             }

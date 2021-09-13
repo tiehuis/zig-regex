@@ -3,7 +3,13 @@
 
 const debug = @import("std").debug;
 
-usingnamespace @import("parse.zig");
+const parse = @import("parse.zig");
+const compile = @import("compile.zig");
+
+const Expr = parse.Expr;
+const Instruction = compile.Instruction;
+const InstructionData = compile.InstructionData;
+const Program = compile.Program;
 
 pub fn printCharEscaped(ch: u8) void {
     switch (ch) {
@@ -84,8 +90,6 @@ fn dumpExprIndent(e: Expr, indent: usize) void {
         },
     }
 }
-
-usingnamespace @import("compile.zig");
 
 pub fn dumpInstruction(s: Instruction) void {
     switch (s.data) {

@@ -186,7 +186,7 @@ const StringIterator = struct {
                 break;
             }
 
-            if (charToDigit(ch, radix)) |is_valid| {
+            if (charToDigit(ch, radix)) |_| {
                 it.bump();
             } else |_| {
                 break;
