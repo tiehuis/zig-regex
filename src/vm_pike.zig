@@ -33,7 +33,7 @@ const ExecState = struct {
     arena: ArenaAllocator,
     slot_count: usize,
 
-    pub fn init(allocator: *Allocator, program: Program) Self {
+    pub fn init(allocator: Allocator, program: Program) Self {
         return Self{
             .arena = ArenaAllocator.init(allocator),
             .slot_count = program.slot_count,
@@ -45,13 +45,13 @@ const ExecState = struct {
     }
 
     pub fn newSlot(self: *Self) ![]?usize {
-        var slots = try self.arena.allocator.alloc(?usize, self.slot_count);
+        var slots = try self.arena.allocator().alloc(?usize, self.slot_count);
         mem.set(?usize, slots, null);
         return slots;
     }
 
     pub fn cloneSlots(self: *Self, other: []?usize) ![]?usize {
-        var slots = try self.arena.allocator.alloc(?usize, self.slot_count);
+        var slots = try self.arena.allocator().alloc(?usize, self.slot_count);
         mem.copy(?usize, slots, other);
         return slots;
     }
@@ -60,9 +60,9 @@ const ExecState = struct {
 pub const VmPike = struct {
     const Self = @This();
 
-    allocator: *Allocator,
+    allocator: Allocator,
 
-    pub fn init(allocator: *Allocator) Self {
+    pub fn init(allocator: Allocator) Self {
         return Self{ .allocator = allocator };
     }
 

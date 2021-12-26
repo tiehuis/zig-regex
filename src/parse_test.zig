@@ -143,7 +143,7 @@ var fbuffer: [800000]u8 = undefined;
 var fixed_allocator = FixedBufferAllocator.init(fbuffer[0..]);
 
 fn check(re: []const u8, expected_ast: []const u8) void {
-    var p = Parser.init(&fixed_allocator.allocator);
+    var p = Parser.init(fixed_allocator.allocator());
     const expr = p.parse(re) catch unreachable;
 
     var ast = repr(expr) catch unreachable;
@@ -153,7 +153,7 @@ fn check(re: []const u8, expected_ast: []const u8) void {
     const trimmed_expected_ast = mem.trim(u8, expected_ast, &spaces);
 
     if (!mem.eql(u8, trimmed_ast, trimmed_expected_ast)) {
-        debug.warn(
+        debug.print(
             \\
             \\-- parsed the regex
             \\
@@ -526,7 +526,7 @@ test "parse character classes" {
 fn checkError(re: []const u8, expected_err: ParseError) void {
     var a = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer a.deinit();
-    var p = Parser.init(&a.allocator);
+    var p = Parser.init(a.allocator());
     const parse_result = p.parse(re);
 
     if (parse_result) |expr| {
@@ -534,7 +534,7 @@ fn checkError(re: []const u8, expected_err: ParseError) void {
         const spaces = [_]u8{ ' ', '\n' };
         const trimmed_ast = mem.trim(u8, ast, &spaces);
 
-        debug.warn(
+        debug.print(
             \\
             \\-- parsed the regex
             \\
@@ -558,7 +558,7 @@ fn checkError(re: []const u8, expected_err: ParseError) void {
         @panic("assertion failure");
     } else |found_err| {
         if (found_err != expected_err) {
-            debug.warn(
+            debug.print(
                 \\
                 \\-- parsed the regex
                 \\

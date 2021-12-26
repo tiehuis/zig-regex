@@ -122,9 +122,9 @@ pub const Program = struct {
     // Max number of slots required
     slot_count: usize,
     // Allocator which owns the instructions
-    allocator: *Allocator,
+    allocator: Allocator,
 
-    pub fn init(allocator: *Allocator, a: []Instruction, find_start: usize, slot_count: usize) Program {
+    pub fn init(allocator: Allocator, a: []Instruction, find_start: usize, slot_count: usize) Program {
         return Program{
             .allocator = allocator,
             .insts = a,
@@ -169,11 +169,11 @@ const Patch = struct {
 pub const Compiler = struct {
     // Stores all partial instructions
     insts: ArrayList(PartialInst),
-    allocator: *Allocator,
+    allocator: Allocator,
     // Capture state
     capture_index: usize,
 
-    pub fn init(a: *Allocator) Compiler {
+    pub fn init(a: Allocator) Compiler {
         return Compiler{
             .insts = ArrayList(PartialInst).init(a),
             .allocator = a,

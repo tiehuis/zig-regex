@@ -14,20 +14,20 @@ const Program = compile.Program;
 pub fn printCharEscaped(ch: u8) void {
     switch (ch) {
         '\t' => {
-            debug.warn("\\t", .{});
+            debug.print("\\t", .{});
         },
         '\r' => {
-            debug.warn("\\r", .{});
+            debug.print("\\r", .{});
         },
         '\n' => {
-            debug.warn("\\n", .{});
+            debug.print("\\n", .{});
         },
         // printable characters
         32...126 => {
-            debug.warn("{c}", .{ch});
+            debug.print("{c}", .{ch});
         },
         else => {
-            debug.warn("0x{x}", .{ch});
+            debug.print("0x{x}", .{ch});
         },
     }
 }
@@ -39,54 +39,54 @@ pub fn dumpExpr(e: Expr) void {
 fn dumpExprIndent(e: Expr, indent: usize) void {
     var i: usize = 0;
     while (i < indent) : (i += 1) {
-        debug.warn(" ", .{});
+        debug.print(" ", .{});
     }
 
     switch (e) {
         Expr.AnyCharNotNL => {
-            debug.warn("{s}\n", .{@tagName(e)});
+            debug.print("{s}\n", .{@tagName(e)});
         },
         Expr.EmptyMatch => |assertion| {
-            debug.warn("{s}({s})\n", .{ @tagName(e), @tagName(assertion) });
+            debug.print("{s}({s})\n", .{ @tagName(e), @tagName(assertion) });
         },
         Expr.Literal => |lit| {
-            debug.warn("{s}(", .{@tagName(e)});
+            debug.print("{s}(", .{@tagName(e)});
             printCharEscaped(lit);
-            debug.warn(")\n", .{});
+            debug.print(")\n", .{});
         },
         Expr.Capture => |subexpr| {
-            debug.warn("{s}\n", .{@tagName(e)});
+            debug.print("{s}\n", .{@tagName(e)});
             dumpExprIndent(subexpr.*, indent + 1);
         },
         Expr.Repeat => |repeat| {
-            debug.warn("{s}(min={d}, max={d}, greedy={d})\n", .{ @tagName(e), repeat.min, repeat.max, repeat.greedy });
+            debug.print("{s}(min={d}, max={d}, greedy={d})\n", .{ @tagName(e), repeat.min, repeat.max, repeat.greedy });
             dumpExprIndent(repeat.subexpr.*, indent + 1);
         },
         Expr.ByteClass => |class| {
-            debug.warn("{s}(", .{@tagName(e)});
+            debug.print("{s}(", .{@tagName(e)});
             for (class.ranges.items) |r| {
-                debug.warn("[", .{});
+                debug.print("[", .{});
                 printCharEscaped(r.min);
-                debug.warn("-", .{});
+                debug.print("-", .{});
                 printCharEscaped(r.max);
-                debug.warn("]", .{});
+                debug.print("]", .{});
             }
-            debug.warn(")\n", .{});
+            debug.print(")\n", .{});
         },
         // TODO: Can we get better type unification on enum variants with the same type?
         Expr.Concat => |subexprs| {
-            debug.warn("{s}\n", .{@tagName(e)});
+            debug.print("{s}\n", .{@tagName(e)});
             for (subexprs.items) |s|
                 dumpExprIndent(s.*, indent + 1);
         },
         Expr.Alternate => |subexprs| {
-            debug.warn("{s}\n", .{@tagName(e)});
+            debug.print("{s}\n", .{@tagName(e)});
             for (subexprs.items) |s|
                 dumpExprIndent(s.*, indent + 1);
         },
         // NOTE: Shouldn't occur ever in returned output.
         Expr.PseudoLeftParen => {
-            debug.warn("{s}\n", .{@tagName(e)});
+            debug.print("{s}\n", .{@tagName(e)});
         },
     }
 }
@@ -94,39 +94,39 @@ fn dumpExprIndent(e: Expr, indent: usize) void {
 pub fn dumpInstruction(s: Instruction) void {
     switch (s.data) {
         InstructionData.Char => |ch| {
-            debug.warn("char({}) '{c}'\n", .{ s.out, ch });
+            debug.print("char({}) '{c}'\n", .{ s.out, ch });
         },
         InstructionData.EmptyMatch => |assertion| {
-            debug.warn("empty({}) {s}\n", .{ s.out, @tagName(assertion) });
+            debug.print("empty({}) {s}\n", .{ s.out, @tagName(assertion) });
         },
         InstructionData.ByteClass => |class| {
-            debug.warn("range({}) ", .{s.out});
+            debug.print("range({}) ", .{s.out});
             for (class.ranges.items) |r|
-                debug.warn("[{d}-{d}]", .{ r.min, r.max });
-            debug.warn("\n", .{});
+                debug.print("[{d}-{d}]", .{ r.min, r.max });
+            debug.print("\n", .{});
         },
         InstructionData.AnyCharNotNL => {
-            debug.warn("any({})\n", .{s.out});
+            debug.print("any({})\n", .{s.out});
         },
         InstructionData.Match => {
-            debug.warn("match\n", .{});
+            debug.print("match\n", .{});
         },
         InstructionData.Jump => {
-            debug.warn("jump({})\n", .{s.out});
+            debug.print("jump({})\n", .{s.out});
         },
         InstructionData.Split => |branch| {
-            debug.warn("split({}) {}\n", .{ s.out, branch });
+            debug.print("split({}) {}\n", .{ s.out, branch });
         },
         InstructionData.Save => |slot| {
-            debug.warn("save({}), {}\n", .{ s.out, slot });
+            debug.print("save({}), {}\n", .{ s.out, slot });
         },
     }
 }
 
 pub fn dumpProgram(s: Program) void {
-    debug.warn("start: {}\n\n", .{s.start});
+    debug.print("start: {}\n\n", .{s.start});
     for (s.insts) |inst, i| {
-        debug.warn("L{}: ", .{i});
+        debug.print("L{}: ", .{i});
         dumpInstruction(inst);
     }
 }
