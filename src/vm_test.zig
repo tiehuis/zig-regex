@@ -41,7 +41,7 @@ fn nullableEql(comptime T: type, a: []const ?T, b: []const ?T) bool {
 }
 
 fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
-    var re = Regex.compile(&fixed_allocator.allocator, re_input) catch unreachable;
+    var re = Regex.compile(fixed_allocator.allocator(), re_input) catch unreachable;
 
     // This is just an engine comparison test but we should also test against fixed vectors
     var backtrack = VmBacktrack.init(re.allocator);
@@ -59,7 +59,7 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
 
     // Note: slot entries are invalid on non-match
     if (pike_result != backtrack_result or (expected == true and !slots_equal)) {
-        debug.warn(
+        debug.print(
             \\
             \\ -- Failure! ----------------
             \\
@@ -69,7 +69,7 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
             \\
         , .{ pike_result, backtrack_result });
 
-        debug.warn(
+        debug.print(
             \\
             \\ -- Slots -------------------
             \\
@@ -77,22 +77,22 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
             \\
         , .{});
         for (pike_slots.items) |entry| {
-            debug.warn("{d} ", .{entry});
+            debug.print("{d} ", .{entry});
         }
-        debug.warn("\n", .{});
+        debug.print("\n", .{});
 
-        debug.warn(
+        debug.print(
             \\
             \\
             \\backtrack
             \\
         , .{});
         for (backtrack_slots.items) |entry| {
-            debug.warn("{d} ", .{entry});
+            debug.print("{d} ", .{entry});
         }
-        debug.warn("\n", .{});
+        debug.print("\n", .{});
 
-        debug.warn(
+        debug.print(
             \\
             \\ -- Regex ------------------
             \\
@@ -107,21 +107,21 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
         defer p.deinit();
         const expr = p.parse(re_input) catch unreachable;
 
-        debug.warn(
+        debug.print(
             \\
             \\ -- Expression Tree ------------
             \\
         , .{});
         re_debug.dumpExpr(expr.*);
 
-        debug.warn(
+        debug.print(
             \\
             \\ -- Bytecode -------------------
             \\
         , .{});
         re_debug.dumpProgram(re.compiled);
 
-        debug.warn(
+        debug.print(
             \\
             \\ -------------------------------
             \\

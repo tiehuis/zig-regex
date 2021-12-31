@@ -38,7 +38,7 @@ pub fn RangeSet(comptime T: type) type {
         //  - x.max < y.min
         ranges: ArrayList(RangeType),
 
-        pub fn init(a: *Allocator) Self {
+        pub fn init(a: Allocator) Self {
             return Self{ .ranges = ArrayList(RangeType).init(a) };
         }
 
@@ -147,7 +147,7 @@ pub const ByteClassTemplates = struct {
     const ByteRange = Range(u8);
     const ByteClass = RangeSet(u8);
 
-    pub fn Whitespace(a: *Allocator) !ByteClass {
+    pub fn Whitespace(a: Allocator) !ByteClass {
         var rs = ByteClass.init(a);
         errdefer rs.deinit();
 
@@ -159,7 +159,7 @@ pub const ByteClassTemplates = struct {
         return rs;
     }
 
-    pub fn NonWhitespace(a: *Allocator) !ByteClass {
+    pub fn NonWhitespace(a: Allocator) !ByteClass {
         var rs = try Whitespace(a);
         errdefer rs.deinit();
 
@@ -167,7 +167,7 @@ pub const ByteClassTemplates = struct {
         return rs;
     }
 
-    pub fn AlphaNumeric(a: *Allocator) !ByteClass {
+    pub fn AlphaNumeric(a: Allocator) !ByteClass {
         var rs = ByteClass.init(a);
         errdefer rs.deinit();
 
@@ -178,7 +178,7 @@ pub const ByteClassTemplates = struct {
         return rs;
     }
 
-    pub fn NonAlphaNumeric(a: *Allocator) !ByteClass {
+    pub fn NonAlphaNumeric(a: Allocator) !ByteClass {
         var rs = try AlphaNumeric(a);
         errdefer rs.deinit();
 
@@ -186,7 +186,7 @@ pub const ByteClassTemplates = struct {
         return rs;
     }
 
-    pub fn Digits(a: *Allocator) !ByteClass {
+    pub fn Digits(a: Allocator) !ByteClass {
         var rs = ByteClass.init(a);
         errdefer rs.deinit();
 
@@ -195,7 +195,7 @@ pub const ByteClassTemplates = struct {
         return rs;
     }
 
-    pub fn NonDigits(a: *Allocator) !ByteClass {
+    pub fn NonDigits(a: Allocator) !ByteClass {
         var rs = try Digits(a);
         errdefer rs.deinit();
 

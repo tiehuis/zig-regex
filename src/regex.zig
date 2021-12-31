@@ -22,7 +22,7 @@ const InputBytes = @import("input.zig").InputBytes;
 
 pub const Regex = struct {
     // Internal allocator
-    allocator: *Allocator,
+    allocator: Allocator,
     // A compiled set of instructions
     compiled: Program,
     // Capture slots
@@ -31,7 +31,7 @@ pub const Regex = struct {
     string: []const u8,
 
     // Compile a regex, possibly returning any error which occurred.
-    pub fn compile(a: *Allocator, re: []const u8) !Regex {
+    pub fn compile(a: Allocator, re: []const u8) !Regex {
         var p = Parser.init(a);
         defer p.deinit();
 
@@ -91,7 +91,7 @@ pub const Captures = struct {
     const Self = @This();
 
     input: []const u8,
-    allocator: *Allocator,
+    allocator: Allocator,
     slots: []const ?usize,
 
     pub fn init(input: []const u8, slots: *ArrayList(?usize)) !Captures {

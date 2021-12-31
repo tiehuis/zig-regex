@@ -12,10 +12,10 @@ var buffer: [800000]u8 = undefined;
 var fixed_allocator = FixedBufferAllocator.init(buffer[0..]);
 
 fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
-    var re = Regex.compile(&fixed_allocator.allocator, re_input) catch unreachable;
+    var re = Regex.compile(fixed_allocator.allocator(), re_input) catch unreachable;
 
     if ((re.partialMatch(to_match) catch unreachable) != expected) {
-        debug.warn(
+        debug.print(
             \\
             \\ -- Failure! ------------------
             \\
@@ -34,21 +34,21 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
         defer p.deinit();
         const expr = p.parse(re_input) catch unreachable;
 
-        debug.warn(
+        debug.print(
             \\
             \\ -- Expression Tree ------------
             \\
         , .{});
         re_debug.dumpExpr(expr.*);
 
-        debug.warn(
+        debug.print(
             \\
             \\ -- Bytecode -------------------
             \\
         , .{});
         re_debug.dumpProgram(re.compiled);
 
-        debug.warn(
+        debug.print(
             \\
             \\ -------------------------------
             \\

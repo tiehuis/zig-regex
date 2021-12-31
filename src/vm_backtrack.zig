@@ -53,9 +53,9 @@ const ExecState = struct {
 // nodes are cached across threads.
 pub const VmBacktrack = struct {
     const Self = @This();
-    allocator: *Allocator,
+    allocator: Allocator,
 
-    pub fn init(allocator: *Allocator) Self {
+    pub fn init(allocator: Allocator) Self {
         return Self{ .allocator = allocator };
     }
 
