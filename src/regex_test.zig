@@ -113,6 +113,14 @@ test "regex sanity tests" {
     check("[^\\w][^-1-4]", "!.", true);
     check("[^\\w][^-1-4]", " x", true);
     check("[^\\w][^-1-4]", "$b", true);
+    check("\\bx\\b", "x", true);
+    check("\\bx\\b", " x ", true);
+    check("\\bx", "Ax", false);
+    check("x\\b", "xA", false);
+    check("\\Bx\\B", "x", false);
+    check("\\Bx\\B", " x ", false);
+    check("\\Bx", "Ax", true);
+    check("x\\B", "xA", true);
 }
 
 test "regex captures" {

@@ -17,6 +17,7 @@ pub const Input = struct {
     advanceFn: *const fn (input: *Input) void,
     isNextWordCharFn: *const fn (input: Input) bool,
     isPrevWordCharFn: *const fn (input: Input) bool,
+    isCurrWordCharFn: *const fn (input: Input) bool,
 
     pub fn advance(self: *Input) void {
         self.advanceFn(self);
@@ -51,10 +52,10 @@ pub const Input = struct {
                 return self.byte_pos >= self.bytes.len - 1;
             },
             Assertion.WordBoundaryAscii => {
-                return self.isPrevWordCharFn(self) != self.isNextWordCharFn(self);
+                return self.isPrevWordCharFn(self) != self.isCurrWordCharFn(self);
             },
             Assertion.NotWordBoundaryAscii => {
-                return self.isPrevWordCharFn(self) == self.isNextWordCharFn(self);
+                return self.isPrevWordCharFn(self) == self.isCurrWordCharFn(self);
             },
         }
     }
@@ -69,6 +70,7 @@ pub const Input = struct {
             .advanceFn = self.advanceFn,
             .isNextWordCharFn = self.isNextWordCharFn,
             .isPrevWordCharFn = self.isPrevWordCharFn,
+            .isCurrWordCharFn = self.isCurrWordCharFn,
         };
     }
 };
@@ -86,6 +88,7 @@ pub const InputBytes = struct {
                 .advanceFn = advance,
                 .isNextWordCharFn = isNextWordChar,
                 .isPrevWordCharFn = isPrevWordChar,
+                .isCurrWordCharFn = isCurrWordChar,
             },
         };
     }
@@ -113,10 +116,14 @@ pub const InputBytes = struct {
     }
 
     fn isNextWordChar(self: Input) bool {
-        return (self.byte_pos == 0) or isWordChar(self.bytes[self.byte_pos - 1]);
+        return (self.byte_pos < self.bytes.len - 1) and isWordChar(self.bytes[self.byte_pos + 1]);
     }
 
     fn isPrevWordChar(self: Input) bool {
-        return (self.byte_pos >= self.bytes.len - 1) or isWordChar(self.bytes[self.byte_pos + 1]);
+        return (self.byte_pos > 0) and isWordChar(self.bytes[self.byte_pos - 1]);
+    }
+
+    fn isCurrWordChar(self: Input) bool {
+        return (self.byte_pos < self.bytes.len) and isWordChar(self.bytes[self.byte_pos]);
     }
 };

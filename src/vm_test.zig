@@ -188,4 +188,12 @@ test "pikevm == backtrackvm" {
     check("[^\\w][^-1-4]", "$b", true);
     check("a{3,}", "aaa", true);
     check(".*emacs.*", "emacs-packages.nix", true);
+    check("\\bx\\b", "x", true);
+    check("\\bx\\b", " x ", true);
+    check("\\bx", "Ax", false);
+    check("x\\b", "xA", false);
+    check("\\Bx\\B", "x", false);
+    check("\\Bx\\B", " x ", false);
+    check("\\Bx", "Ax", true);
+    check("x\\B", "xA", true);
 }

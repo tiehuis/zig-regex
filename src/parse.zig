@@ -857,6 +857,16 @@ pub const Parser = struct {
                     return r;
                 }
             },
+            'b' => {
+                var r = try p.arena.allocator().create(Expr);
+                r.* = Expr{ .EmptyMatch = Assertion.WordBoundaryAscii };
+                return r;
+            },
+            'B' => {
+                var r = try p.arena.allocator().create(Expr);
+                r.* = Expr{ .EmptyMatch = Assertion.NotWordBoundaryAscii };
+                return r;
+            },
             else => {
                 return error.UnrecognizedEscapeCode;
             },
