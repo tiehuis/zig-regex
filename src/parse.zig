@@ -459,7 +459,7 @@ pub const Parser = struct {
                     // - Empty, then push the sub-expression as a concat.
                     // - ( pseudo operator, leave '(' and push concat.
                     // - '|' is found, pop the existing and add a new alternation to the array.
-                    var concat = ArrayList(*Expr).init(p.allocator);
+                    var concat = ArrayList(*Expr).init(p.arena.allocator());
 
                     if (p.stack.items.len == 0 or !p.stack.items[p.stack.items.len - 1].isByteClass()) {
                         return error.EmptyAlternate;
@@ -479,7 +479,7 @@ pub const Parser = struct {
                             }
 
                             var r = try p.arena.allocator().create(Expr);
-                            r.* = Expr{ .Alternate = ArrayList(*Expr).init(p.allocator) };
+                            r.* = Expr{ .Alternate = ArrayList(*Expr).init(p.arena.allocator()) };
                             try r.Alternate.append(ra);
                             try p.stack.append(r);
                             break;
@@ -519,7 +519,7 @@ pub const Parser = struct {
                                 }
 
                                 var r = try p.arena.allocator().create(Expr);
-                                r.* = Expr{ .Alternate = ArrayList(*Expr).init(p.allocator) };
+                                r.* = Expr{ .Alternate = ArrayList(*Expr).init(p.arena.allocator()) };
                                 try r.Alternate.append(ra);
                                 try p.stack.append(r);
                                 break;
@@ -701,10 +701,11 @@ pub const Parser = struct {
                     Expr.Literal => |value| {
                         range = ByteRange{ .min = value, .max = value };
                     },
-                    Expr.ByteClass => |vv| {
+                    Expr.ByteClass => |*vv| {
+                        defer vv.deinit();
                         // '-' doesn't make sense following this, merge class here
                         // and continue next.
-                        try class.mergeClass(vv);
+                        try class.mergeClass(vv.*);
                         continue;
                     },
                     else => unreachable,

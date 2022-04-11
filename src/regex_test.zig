@@ -58,6 +58,11 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
     }
 }
 
+fn checkCompile(allocator: mem.Allocator, re_input: []const u8) !void {
+    var re = try Regex.compile(allocator, re_input);
+    re.deinit();
+}
+
 test "regex sanity tests" {
     // Taken from tiny-regex-c
     check("\\d", "5", true);
@@ -113,6 +118,12 @@ test "regex sanity tests" {
     check("[^\\w][^-1-4]", "!.", true);
     check("[^\\w][^-1-4]", " x", true);
     check("[^\\w][^-1-4]", "$b", true);
+    check("a|b", "a", true);
+    check("a|b", "b", true);
+    check("a|b", "x", false);
+    check("[a-b]|[d-f]\\s+", "d ", true);
+    check("[a-b]|[d-f]\\s+", "b", true);
+    check("[a-b]|[d-f]\\s+", "c", false);
     check("\\bx\\b", "x", true);
     check("\\bx\\b", " x ", true);
     check("\\bx", "Ax", false);
@@ -134,4 +145,47 @@ test "regex captures" {
 
     debug.assert(mem.eql(u8, "ab0123", caps.sliceAt(0).?));
     debug.assert(mem.eql(u8, "0123", caps.sliceAt(1).?));
+}
+
+test "regex memory leaks" {
+    const allocator = std.testing.allocator;
+
+    try checkCompile(allocator, "\\d");
+    try checkCompile(allocator, "\\w+");
+    try checkCompile(allocator, "\\s");
+    try checkCompile(allocator, "\\S");
+    try checkCompile(allocator, "[\\s]");
+    try checkCompile(allocator, "[\\S]");
+    try checkCompile(allocator, "\\D");
+    try checkCompile(allocator, "\\W+");
+    try checkCompile(allocator, "[0-9]+");
+    try checkCompile(allocator, "[^\\w]");
+    try checkCompile(allocator, "[\\W]");
+    try checkCompile(allocator, "[\\w]");
+    try checkCompile(allocator, "[^\\d]");
+    try checkCompile(allocator, "[\\d]");
+    try checkCompile(allocator, "[^\\D]");
+    try checkCompile(allocator, "[\\D]");
+    try checkCompile(allocator, "^.*\\\\.*$");
+    try checkCompile(allocator, "^[\\+-]*[\\d]+$");
+    try checkCompile(allocator, "[abc]");
+    try checkCompile(allocator, "[1-5]+");
+    try checkCompile(allocator, "[.2]");
+    try checkCompile(allocator, "a*$");
+    try checkCompile(allocator, "[a-h]+");
+    try checkCompile(allocator, "[^\\s]+");
+    try checkCompile(allocator, "[^fc]+");
+    try checkCompile(allocator, "[^d\\sf]+");
+    try checkCompile(allocator, "\n");
+    try checkCompile(allocator, "b.\\s*\n");
+    try checkCompile(allocator, ".*c");
+    try checkCompile(allocator, ".+c");
+    try checkCompile(allocator, "[b-z].*");
+    try checkCompile(allocator, "b[k-z]*");
+    try checkCompile(allocator, "[0-9]");
+    try checkCompile(allocator, "[^0-9]");
+    try checkCompile(allocator, "a?");
+    try checkCompile(allocator, "[Hh]ello [Ww]orld\\s*[!]?");
+    try checkCompile(allocator, "[^\\w][^-1-4]");
+    try checkCompile(allocator, "[a-b]|[d-f]\\s+");
 }

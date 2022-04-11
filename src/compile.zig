@@ -519,9 +519,10 @@ pub const Compiler = struct {
         switch (hole) {
             Hole.None => {},
             Hole.One => |pc| c.insts.items[pc].fill(goto1),
-            Hole.Many => |holes| {
+            Hole.Many => |*holes| {
                 for (holes.items) |hole1|
                     c.fill(hole1, goto1);
+                holes.deinit();
             },
         }
     }
