@@ -13,10 +13,10 @@ pub const Input = struct {
     bytes: []const u8,
     byte_pos: usize,
 
-    currentFn: fn (input: Input) ?u8,
-    advanceFn: fn (input: *Input) void,
-    isNextWordCharFn: fn (input: Input) bool,
-    isPrevWordCharFn: fn (input: Input) bool,
+    currentFn: *const fn (input: Input) ?u8,
+    advanceFn: *const fn (input: *Input) void,
+    isNextWordCharFn: *const fn (input: Input) bool,
+    isPrevWordCharFn: *const fn (input: Input) bool,
 
     pub fn advance(self: *Input) void {
         self.advanceFn(self);

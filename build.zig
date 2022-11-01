@@ -13,7 +13,7 @@ pub fn build(b: *Builder) void {
 
     const c_example_step = b.step("c-example", "Example using C API");
     const c_example = b.addExecutable("example", "example/example.c");
-    c_example.addIncludeDir("include");
+    c_example.addIncludePath("include");
     c_example.linkLibC();
     c_example.linkLibrary(build_lib);
     c_example_step.dependOn(&build_lib.step);
