@@ -21,7 +21,7 @@ fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
             \\
             \\Regex:    '{s}'
             \\String:   '{s}'
-            \\Expected: {s}
+            \\Expected: {any}
             \\
         , .{
             re_input,
