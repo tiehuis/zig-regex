@@ -285,13 +285,15 @@ pub const Compiler = struct {
 
                     var i: usize = 1;
                     while (i < repeat.min) : (i += 1) {
-                        const ep = try c.compileInternal(repeat.subexpr);
+                        const new_subexpr = try repeat.subexpr.clone();
+                        const ep = try c.compileInternal(&new_subexpr);
                         c.fill(hole, ep.entry);
                         hole = ep.hole;
                     }
 
                     // add final e* infinite capture
-                    const st = try c.compileStar(repeat.subexpr, repeat.greedy);
+                    var new_subexpr = try repeat.subexpr.clone();
+                    const st = try c.compileStar(&new_subexpr, repeat.greedy);
                     c.fill(hole, st.entry);
 
                     return Patch{ .hole = st.hole, .entry = entry };
@@ -305,14 +307,16 @@ pub const Compiler = struct {
 
                     var i: usize = 1;
                     while (i < repeat.min) : (i += 1) {
-                        const ep = try c.compileInternal(repeat.subexpr);
+                        const new_subexpr = try repeat.subexpr.clone();
+                        const ep = try c.compileInternal(&new_subexpr);
                         c.fill(hole, ep.entry);
                         hole = ep.hole;
                     }
 
                     // repeated optional concatenations
                     while (i < repeat.max.?) : (i += 1) {
-                        const ep = try c.compileQuestion(repeat.subexpr, repeat.greedy);
+                        var new_subexpr = try repeat.subexpr.clone();
+                        const ep = try c.compileQuestion(&new_subexpr, repeat.greedy);
                         c.fill(hole, ep.entry);
                         hole = ep.hole;
                     }

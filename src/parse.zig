@@ -80,6 +80,13 @@ pub const Expr = union(enum) {
             else => return false,
         }
     }
+
+    pub fn clone(re: *Expr) !Expr {
+        return switch (re.*) {
+            Expr.ByteClass => |*bc| Expr{ .ByteClass = .{ .ranges = try bc.ranges.clone() } },
+            else => re.*,
+        };
+    }
 };
 
 // Private in fmt.

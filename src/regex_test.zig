@@ -188,4 +188,8 @@ test "regex memory leaks" {
     try checkCompile(allocator, "[Hh]ello [Ww]orld\\s*[!]?");
     try checkCompile(allocator, "[^\\w][^-1-4]");
     try checkCompile(allocator, "[a-b]|[d-f]\\s+");
+    try checkCompile(allocator, "x\\b");
+    try checkCompile(allocator, "x\\B");
+    try checkCompile(allocator, "[0-9]{2,}");
+    try checkCompile(allocator, "[0-9]{2,3}");
 }
