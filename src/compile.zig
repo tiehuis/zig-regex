@@ -240,7 +240,7 @@ pub const Compiler = struct {
         };
         try p.appendSlice(&fragment);
 
-        return Program.init(p.allocator, p.toOwnedSlice(), fragment_start, c.capture_index);
+        return Program.init(p.allocator, try p.toOwnedSlice(), fragment_start, c.capture_index);
     }
 
     fn compileInternal(c: *Compiler, expr: *const Expr) Allocator.Error!Patch {
