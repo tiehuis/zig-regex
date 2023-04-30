@@ -56,7 +56,7 @@ pub fn RangeSet(comptime T: type) type {
             }
 
             // Insert range.
-            for (ranges.items) |r, i| {
+            for (ranges.items, 0..) |r, i| {
                 if (range.min <= r.min) {
                     try ranges.insert(i, range);
                     break;
