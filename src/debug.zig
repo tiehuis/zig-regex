@@ -125,7 +125,7 @@ pub fn dumpInstruction(s: Instruction) void {
 
 pub fn dumpProgram(s: Program) void {
     debug.print("start: {}\n\n", .{s.start});
-    for (s.insts) |inst, i| {
+    for (s.insts, 0..) |inst, i| {
         debug.print("L{}: ", .{i});
         dumpInstruction(inst);
     }
