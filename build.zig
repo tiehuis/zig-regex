@@ -4,6 +4,10 @@ pub fn build(b: *Builder) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    _ = b.addModule("regex", .{
+        .source_file = .{ .path = "src/regex.zig" },
+    });
+
     // library tests
     const library_tests = b.addTest(.{
         .root_source_file = .{ .path = "src/all_test.zig" },
