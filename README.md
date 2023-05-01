@@ -12,7 +12,7 @@ Note: This is still a work in progress and many things still need to be done.
 
 ```zig
 const debug = @import("std").debug;
-const Regex = @import("regex.zig").Regex;
+const Regex = @import("regex").Regex;
 
 test "example" {
     var re = try Regex.compile(debug.global_allocator, "\\w+");
@@ -26,7 +26,7 @@ test "example" {
 ### Regex
 
 ```zig
-fn compile(a: &Allocator, re: []const u8) !Regex
+fn compile(a: Allocator, re: []const u8) !Regex
 ```
 
 Compiles a regex string, returning any errors during parsing/compiling.
@@ -34,7 +34,7 @@ Compiles a regex string, returning any errors during parsing/compiling.
 ---
 
 ```zig
-pub fn match(re: &const Regex, input: []const u8) !bool
+pub fn match(re: *Regex, input: []const u8) !bool
 ```
 
 Match a compiled regex against some input. The input must be matched in its
@@ -43,7 +43,7 @@ entirety and from the first index.
 ---
 
 ```zig
-pub fn partialMatch(re: &const Regex, input: []const u8) !bool
+pub fn partialMatch(re: *Regex, input: []const u8) !bool
 ```
 
 Match a compiled regex against some input. Unlike `match`, this matches the
@@ -52,7 +52,7 @@ leftmost and does not have to be anchored to the start of `input`.
 ---
 
 ```zig
-pub fn captures(re: &const Regex, input: []const u8) !?Captures
+pub fn captures(re: *Regex, input: []const u8) !?Captures
 ```
 
 Match a compiled regex against some input. Returns a list of all matching
@@ -63,14 +63,14 @@ If no match was found, null is returned.
 ### Captures
 
 ```zig
-pub fn sliceAt(captures: &const Captures, n: usize) ?[]const u8
+pub fn sliceAt(captures: *const Captures, n: usize) ?[]const u8
 ```
 
 Return the sub-slice for the numbered capture group. 0 refers to the entire
 match.
 
 ```zig
-pub fn boundsAt(captures: &const Captures, n: usize) ?Span
+pub fn boundsAt(captures: *const Captures, n: usize) ?Span
 ```
 
 Return the lower and upper byte positions for the specified capture group.
