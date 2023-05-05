@@ -46,7 +46,7 @@ const ExecState = struct {
 
     pub fn newSlot(self: *Self) ![]?usize {
         var slots = try self.arena.allocator().alloc(?usize, self.slot_count);
-        mem.set(?usize, slots, null);
+        @memset(slots, null);
         return slots;
     }
 
