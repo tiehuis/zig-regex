@@ -57,21 +57,15 @@ export fn zre_captures_slice_at(cap: ?*const zre_captures_t, n: usize) ?[*]const
     return slice.ptr;
 }
 
-export fn zre_captures_bounds_at(cap: ?*const zre_captures_t, n: usize, is_null: ?*bool) zre_captures_span_t {
+export fn zre_captures_bounds_at(cap: ?*const zre_captures_t, sp: ?*zre_captures_span_t, n: usize) bool {
     const c = @ptrCast(*const Captures, @alignCast(8, cap));
     var span = c.boundsAt(n);
-    if (span) |s| {
-        is_null.?.* = false;
-        return zre_captures_span_t {
-            .lower = s.lower,
-            .upper = s.upper,
-        };
+    if (span) |s| {      
+        sp.?.*.lower = s.lower;
+        sp.?.*.upper = s.upper;
+        return true;
     }
-    is_null.?.* = true;
-    return zre_captures_span_t {
-        .lower = 0,
-        .upper = 0,
-    };
+    return false;
 }
 
 export fn zre_captures_deinit(cap: ?*zre_captures_t) void {
