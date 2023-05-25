@@ -2,7 +2,7 @@
 #include "regex.h"
 
 int main() {
-  zre_regex *re = zre_compile(".*world.*");
+  zre_regex_t *re = zre_compile(".*world.*");
   if (!re) {
     printf("Regex compile error\n");
     return 1;

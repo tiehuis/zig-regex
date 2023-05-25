@@ -6,7 +6,7 @@ const regex = @import("regex.zig");
 const Regex = regex.Regex;
 const Captures = regex.Captures;
 
-const zre_regex = opaque {};
+const zre_regex_t = opaque {};
 const zre_captures_t = opaque {};
 
 const zre_captures_span_t = extern struct {
@@ -16,28 +16,28 @@ const zre_captures_span_t = extern struct {
 
 var allocator = std.heap.c_allocator;
 
-export fn zre_compile(input: ?[*:0]const u8) ?*zre_regex {
+export fn zre_compile(input: ?[*:0]const u8) ?*zre_regex_t {
     var r = allocator.create(Regex) catch return null;
     r.* = Regex.compile(allocator, std.mem.span(input.?)) catch return null;
-    return @ptrCast(?*zre_regex, r);
+    return @ptrCast(?*zre_regex_t, r);
 }
 
-export fn zre_match(re: ?*zre_regex, input: ?[*:0]const u8) bool {
+export fn zre_match(re: ?*zre_regex_t, input: ?[*:0]const u8) bool {
     var r = @ptrCast(*Regex, @alignCast(8, re));
     return r.match(std.mem.span(input.?)) catch return false;
 }
 
-export fn zre_partial_match(re: ?*zre_regex, input: ?[*:0]const u8) bool {
+export fn zre_partial_match(re: ?*zre_regex_t, input: ?[*:0]const u8) bool {
     var r = @ptrCast(*Regex, @alignCast(8, re));
     return r.partialMatch(std.mem.span(input.?)) catch return false;
 }
 
-export fn zre_deinit(re: ?*zre_regex) void {
+export fn zre_deinit(re: ?*zre_regex_t) void {
     var r = @ptrCast(*Regex, @alignCast(8, re));
     r.deinit();
 }
 
-export fn zre_captures(re: ?*zre_regex, input: ?[*:0]const u8) ?*zre_captures_t {
+export fn zre_captures(re: ?*zre_regex_t, input: ?[*:0]const u8) ?*zre_captures_t {
     var r = @ptrCast(*Regex, @alignCast(8, re));
     var c = allocator.create(Captures) catch return null;
     c.* = (r.captures(std.mem.span(input.?)) catch return null) orelse return null;
