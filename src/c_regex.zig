@@ -35,6 +35,7 @@ export fn zre_partial_match(re: ?*zre_regex_t, input: ?[*:0]const u8) bool {
 export fn zre_deinit(re: ?*zre_regex_t) void {
     var r = @ptrCast(*Regex, @alignCast(8, re));
     r.deinit();
+    allocator.destroy(r);
 }
 
 export fn zre_captures(re: ?*zre_regex_t, input: ?[*:0]const u8) ?*zre_captures_t {
@@ -76,5 +77,5 @@ export fn zre_captures_bounds_at(cap: ?*const zre_captures_t, n: usize, is_null:
 export fn zre_captures_deinit(cap: ?*zre_captures_t) void {
     var c = @ptrCast(*Captures, @alignCast(8, cap));
     c.deinit();
+    allocator.destroy(c);
 }
-
