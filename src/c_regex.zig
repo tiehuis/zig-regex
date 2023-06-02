@@ -51,9 +51,12 @@ export fn zre_captures_len(cap: ?*const zre_captures) usize {
     return c.slots.len / 2;
 }
 
-export fn zre_captures_slice_at(cap: ?*const zre_captures, n: usize) ?[*]const u8 {
+export fn zre_captures_slice_at(cap: ?*const zre_captures, n: usize, len: ?*usize) ?[*]const u8 {
     const c = @ptrCast(*const Captures, @alignCast(8, cap));
     var slice = c.sliceAt(n) orelse return null;
+    if (len) |ln| {
+        ln.* = slice.len;
+    }
     return slice.ptr;
 }
 

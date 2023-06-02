@@ -24,7 +24,7 @@ extern zre_captures* zre_captures_all(zre_regex* re, const char* input);
 
 extern size_t zre_captures_len(const zre_captures* cap);
 
-extern const char* zre_captures_slice_at(const zre_captures* cap, size_t n);
+extern const char* zre_captures_slice_at(const zre_captures* cap, size_t n, size_t* len);
 
 extern bool zre_captures_bounds_at(const zre_captures* cap, zre_captures_span* sp, size_t n);
 
