@@ -20,7 +20,7 @@ extern bool zre_partial_match(zre_regex* re, const char* input);
 
 extern void zre_deinit(zre_regex* re);
 
-extern zre_captures* zre_captures(zre_regex* re, const char* input);
+extern zre_captures* zre_captures_all(zre_regex* re, const char* input);
 
 extern size_t zre_captures_len(const zre_captures* cap);
 

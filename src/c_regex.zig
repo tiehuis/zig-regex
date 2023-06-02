@@ -38,7 +38,7 @@ export fn zre_deinit(re: ?*zre_regex) void {
     allocator.destroy(r);
 }
 
-export fn zre_captures(re: ?*zre_regex, input: ?[*:0]const u8) ?*zre_captures {
+export fn zre_captures_all(re: ?*zre_regex, input: ?[*:0]const u8) ?*zre_captures {
     var r = @ptrCast(*Regex, @alignCast(8, re));
     var c = allocator.create(Captures) catch return null;
     c.* = (r.captures(std.mem.span(input.?)) catch return null) orelse return null;
