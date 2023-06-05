@@ -20,15 +20,25 @@ pub fn build(b: *Builder) void {
     test_step.dependOn(&run_library_tests.step);
 
     // C library
-    const lib = b.addStaticLibrary(.{
+    const staticLib = b.addStaticLibrary(.{
         .name = "regex",
         .root_source_file = .{ .path = "src/c_regex.zig" },
         .target = target,
         .optimize = optimize,
     });
-    lib.linkLibC();
+    staticLib.linkLibC();
 
-    b.installArtifact(lib);
+    b.installArtifact(staticLib);
+
+    const sharedLib = b.addSharedLibrary(.{
+        .name = "regex",
+        .root_source_file = .{ .path = "src/c_regex.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    sharedLib.linkLibC();
+
+    b.installArtifact(sharedLib);
 
     // C example
     const c_example = b.addExecutable(.{
@@ -44,10 +54,10 @@ pub fn build(b: *Builder) void {
     });
     c_example.addIncludePath(.{ .path = "include" });
     c_example.linkLibC();
-    c_example.linkLibrary(lib);
+    c_example.linkLibrary(staticLib);
 
     const c_example_step = b.step("c-example", "Example using C API");
-    c_example_step.dependOn(&lib.step);
+    c_example_step.dependOn(&staticLib.step);
     c_example_step.dependOn(&c_example.step);
 
     b.default_step.dependOn(test_step);
