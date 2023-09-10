@@ -73,7 +73,7 @@ pub fn RangeSet(comptime T: type) type {
                 // Overlap (or directly adjacent)
                 const upper = math.add(T, merge.max, 1) catch math.maxInt(T);
                 if (r.min <= upper) {
-                    merge.max = math.max(merge.max, r.max);
+                    merge.max = @max(merge.max, r.max);
                 }
                 // No overlap
                 else {
