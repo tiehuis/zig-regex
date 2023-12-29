@@ -17,7 +17,7 @@ const zre_captures_span = extern struct {
 var allocator = std.heap.c_allocator;
 
 export fn zre_compile(input: ?[*:0]const u8) ?*zre_regex {
-    var r = allocator.create(Regex) catch return null;
+    const r = allocator.create(Regex) catch return null;
     r.* = Regex.compile(allocator, std.mem.span(input.?)) catch return null;
     return @ptrCast(r);
 }
@@ -40,7 +40,7 @@ export fn zre_deinit(re: ?*zre_regex) void {
 
 export fn zre_captures_all(re: ?*zre_regex, input: ?[*:0]const u8) ?*zre_captures {
     var r: *Regex = @ptrCast(@alignCast(re));
-    var c = allocator.create(Captures) catch return null;
+    const c = allocator.create(Captures) catch return null;
     c.* = (r.captures(std.mem.span(input.?)) catch return null) orelse return null;
     return @ptrCast(c);
 }
@@ -52,7 +52,7 @@ export fn zre_captures_len(cap: ?*const zre_captures) usize {
 
 export fn zre_captures_slice_at(cap: ?*const zre_captures, n: usize, len: ?*usize) ?[*]const u8 {
     const c: *const Captures = @ptrCast(@alignCast(cap));
-    var slice = c.sliceAt(n) orelse return null;
+    const slice = c.sliceAt(n) orelse return null;
     if (len) |ln| {
         ln.* = slice.len;
     }
@@ -61,7 +61,7 @@ export fn zre_captures_slice_at(cap: ?*const zre_captures, n: usize, len: ?*usiz
 
 export fn zre_captures_bounds_at(cap: ?*const zre_captures, sp: ?*zre_captures_span, n: usize) bool {
     const c: *const Captures = @ptrCast(@alignCast(cap));
-    var span = c.boundsAt(n);
+    const span = c.boundsAt(n);
     if (span) |s| {
         sp.?.*.lower = s.lower;
         sp.?.*.upper = s.upper;

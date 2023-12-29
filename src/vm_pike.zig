@@ -45,14 +45,14 @@ const ExecState = struct {
     }
 
     pub fn newSlot(self: *Self) ![]?usize {
-        var slots = try self.arena.allocator().alloc(?usize, self.slot_count);
+        const slots = try self.arena.allocator().alloc(?usize, self.slot_count);
         @memset(slots, null);
         return slots;
     }
 
     pub fn cloneSlots(self: *Self, other: []?usize) ![]?usize {
-        var slots = try self.arena.allocator().alloc(?usize, self.slot_count);
-        mem.copy(?usize, slots, other);
+        const slots = try self.arena.allocator().alloc(?usize, self.slot_count);
+        @memcpy(slots, other);
         return slots;
     }
 };

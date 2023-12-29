@@ -41,7 +41,7 @@ fn nullableEql(comptime T: type, a: []const ?T, b: []const ?T) bool {
 }
 
 fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
-    var re = Regex.compile(fixed_allocator.allocator(), re_input) catch unreachable;
+    const re = Regex.compile(fixed_allocator.allocator(), re_input) catch unreachable;
 
     // This is just an engine comparison test but we should also test against fixed vectors
     var backtrack = VmBacktrack.init(re.allocator);

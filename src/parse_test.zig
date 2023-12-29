@@ -23,7 +23,7 @@ const StaticWriter = struct {
     }
 
     pub fn writeFn(self: *StaticWriter, bytes: []const u8) Error!usize {
-        mem.copy(u8, self.buffer[self.last..], bytes);
+        @memcpy(self.buffer[self.last..][0..bytes.len], bytes);
         self.last += bytes.len;
         return bytes.len;
     }
@@ -146,7 +146,7 @@ fn check(re: []const u8, expected_ast: []const u8) void {
     var p = Parser.init(fixed_allocator.allocator());
     const expr = p.parse(re) catch unreachable;
 
-    var ast = repr(expr) catch unreachable;
+    const ast = repr(expr) catch unreachable;
 
     const spaces = [_]u8{ ' ', '\n' };
     const trimmed_ast = mem.trim(u8, ast, &spaces);

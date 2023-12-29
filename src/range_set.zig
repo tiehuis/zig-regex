@@ -100,7 +100,7 @@ pub fn RangeSet(comptime T: type) type {
         //
         // The negation is performed in place.
         pub fn negate(self: *Self) !void {
-            var ranges = &self.ranges;
+            const ranges = &self.ranges;
             // NOTE: Append to end of array then copy and shrink.
             var negated = ArrayList(RangeType).init(self.ranges.allocator);
 

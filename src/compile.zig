@@ -326,7 +326,7 @@ pub const Compiler = struct {
             },
             Expr.Concat => |subexprs| {
                 // Compile each item in the sub-expression
-                var f = subexprs.items[0];
+                const f = subexprs.items[0];
 
                 // First patch
                 const p = try c.compileInternal(f);
@@ -384,7 +384,7 @@ pub const Compiler = struct {
                 errdefer holes.deinit();
 
                 // TODO: Doees this need to be dynamically allocated?
-                var last_hole = try c.allocator.create(Hole);
+                const last_hole = try c.allocator.create(Hole);
                 defer c.allocator.destroy(last_hole);
                 last_hole.* = .None;
 
