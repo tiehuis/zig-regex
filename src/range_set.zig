@@ -46,6 +46,10 @@ pub fn RangeSet(comptime T: type) type {
             self.ranges.deinit();
         }
 
+        pub fn clone(self: Self) !Self {
+            return Self{ .ranges = try self.ranges.clone() };
+        }
+
         // Add a range into the current class, preserving the structure invariants.
         pub fn addRange(self: *Self, range: RangeType) !void {
             var ranges = &self.ranges;
@@ -103,11 +107,12 @@ pub fn RangeSet(comptime T: type) type {
             const ranges = &self.ranges;
             // NOTE: Append to end of array then copy and shrink.
             var negated = ArrayList(RangeType).init(self.ranges.allocator);
+            defer negated.deinit();
 
             if (ranges.items.len == 0) {
                 try negated.append(RangeType.new(math.minInt(T), math.maxInt(T)));
-                mem.swap(ArrayList(RangeType), ranges, &negated);
-                negated.deinit();
+                ranges.clearRetainingCapacity();
+                try ranges.appendSlice(negated.items);
                 return;
             }
 
@@ -127,8 +132,8 @@ pub fn RangeSet(comptime T: type) type {
                 try negated.append(RangeType.new(low, math.maxInt(T)));
             }
 
-            mem.swap(ArrayList(RangeType), ranges, &negated);
-            negated.deinit();
+            ranges.clearRetainingCapacity();
+            try ranges.appendSlice(negated.items);
         }
 
         pub fn contains(self: Self, value: T) bool {
