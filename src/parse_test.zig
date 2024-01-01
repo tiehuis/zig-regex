@@ -138,12 +138,9 @@ fn reprIndent(out: *StaticWriter, e: *Expr, indent: usize) anyerror!void {
     }
 }
 
-// Debug global allocator is too small for our tests
-var fbuffer: [800000]u8 = undefined;
-var fixed_allocator = FixedBufferAllocator.init(fbuffer[0..]);
-
 fn check(re: []const u8, expected_ast: []const u8) void {
-    var p = Parser.init(fixed_allocator.allocator());
+    var p = Parser.init(std.testing.allocator);
+    defer p.deinit();
     const expr = p.parse(re) catch unreachable;
 
     const ast = repr(expr) catch unreachable;
