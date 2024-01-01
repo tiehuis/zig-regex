@@ -71,11 +71,11 @@ pub const Expr = union(enum) {
 
     pub fn isByteClass(re: *const Expr) bool {
         switch (re.*) {
-            Expr.Literal,
-            Expr.ByteClass,
-            Expr.AnyCharNotNL,
+            .Literal,
+            .ByteClass,
+            .AnyCharNotNL,
             // TODO: Don't keep capture here, but allow on repeat operators.
-            Expr.Capture,
+            .Capture,
             => return true,
             else => return false,
         }
@@ -83,14 +83,14 @@ pub const Expr = union(enum) {
 
     pub fn clone(re: *Expr) !Expr {
         return switch (re.*) {
-            Expr.ByteClass => |*bc| try bc.clone(),
+            .ByteClass => |*bc| Expr{ .ByteClass = try bc.clone() },
             else => re.*,
         };
     }
 
     pub fn deinit(re: *Expr) void {
         switch (re.*) {
-            Expr.ByteClass => |*bc| bc.deinit(),
+            .ByteClass => |*bc| bc.deinit(),
         }
     }
 };
@@ -418,7 +418,7 @@ pub const Parser = struct {
                         const e = p.stack.pop();
                         switch (e.*) {
                             // Existing alternation
-                            Expr.Alternate => {
+                            .Alternate => {
                                 mem.reverse(*Expr, concat.items);
 
                                 const ra = try p.createExpr();
@@ -444,7 +444,7 @@ pub const Parser = struct {
                                 break;
                             },
                             // Existing parentheses, push new alternation
-                            Expr.PseudoLeftParen => {
+                            .PseudoLeftParen => {
                                 mem.reverse(*Expr, concat.items);
 
                                 const ra = try p.createExpr();
@@ -505,7 +505,7 @@ pub const Parser = struct {
                         const e = p.stack.pop();
                         switch (e.*) {
                             // Existing alternation, combine
-                            Expr.Alternate => {
+                            .Alternate => {
                                 mem.reverse(*Expr, concat.items);
 
                                 const ra = try p.createExpr();
@@ -522,7 +522,7 @@ pub const Parser = struct {
                                 break;
                             },
                             // Existing parentheses, push new alternation
-                            Expr.PseudoLeftParen => {
+                            .PseudoLeftParen => {
                                 // re-push parentheses marker
                                 try p.stack.append(e);
 
@@ -610,11 +610,11 @@ pub const Parser = struct {
             // pop an item, check if it is an alternate and not a pseudo left paren
             const e = p.stack.pop();
             switch (e.*) {
-                Expr.PseudoLeftParen => {
+                .PseudoLeftParen => {
                     return error.UnclosedParentheses;
                 },
                 // Alternation at top-level, push concat and return
-                Expr.Alternate => {
+                .Alternate => {
                     mem.reverse(*Expr, concat.items);
 
                     const ra = try p.createExpr();
@@ -630,7 +630,7 @@ pub const Parser = struct {
                     // if stack is not empty, this is an error
                     if (p.stack.items.len != 0) {
                         switch (p.stack.pop().*) {
-                            Expr.PseudoLeftParen => return error.UnclosedParentheses,
+                            .PseudoLeftParen => return error.UnclosedParentheses,
                             else => unreachable,
                         }
                     }
@@ -715,10 +715,10 @@ pub const Parser = struct {
                 // NOTE: this is bumped on loop
                 it.index -= 1;
                 switch (r.*) {
-                    Expr.Literal => |value| {
+                    .Literal => |value| {
                         range = ByteRange{ .min = value, .max = value };
                     },
-                    Expr.ByteClass => |*vv| {
+                    .ByteClass => |*vv| {
                         defer vv.deinit();
                         // '-' doesn't make sense following this, merge class here
                         // and continue next.
