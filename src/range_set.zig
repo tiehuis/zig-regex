@@ -50,6 +50,12 @@ pub fn RangeSet(comptime T: type) type {
             return Self{ .ranges = try self.ranges.clone() };
         }
 
+        pub fn dupe(self: Self, a: Allocator) !Self {
+            var cloned = try ArrayList(RangeType).initCapacity(a, self.ranges.items.len);
+            cloned.appendSliceAssumeCapacity(self.ranges.items);
+            return Self{ .ranges = cloned };
+        }
+
         // Add a range into the current class, preserving the structure invariants.
         pub fn addRange(self: *Self, range: RangeType) !void {
             var ranges = &self.ranges;

@@ -251,7 +251,7 @@ pub const Compiler = struct {
             },
             Expr.ByteClass => |classes| {
                 // Similar, we use a special instruction.
-                const h = try c.pushHole(InstHole{ .ByteClass = classes });
+                const h = try c.pushHole(InstHole{ .ByteClass = try classes.dupe(c.allocator) });
                 return Patch{ .hole = h, .entry = c.insts.items.len - 1 };
             },
             Expr.AnyCharNotNL => {

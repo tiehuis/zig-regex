@@ -802,37 +802,37 @@ pub const Parser = struct {
             },
             // perl codes
             's' => {
-                const s = try ByteClassTemplates.Whitespace(p.allocator);
+                const s = try ByteClassTemplates.Whitespace(p.arena.allocator());
                 const r = try p.createExpr();
                 r.* = Expr{ .ByteClass = s };
                 return r;
             },
             'S' => {
-                const s = try ByteClassTemplates.NonWhitespace(p.allocator);
+                const s = try ByteClassTemplates.NonWhitespace(p.arena.allocator());
                 const r = try p.createExpr();
                 r.* = Expr{ .ByteClass = s };
                 return r;
             },
             'w' => {
-                const s = try ByteClassTemplates.AlphaNumeric(p.allocator);
+                const s = try ByteClassTemplates.AlphaNumeric(p.arena.allocator());
                 const r = try p.createExpr();
                 r.* = Expr{ .ByteClass = s };
                 return r;
             },
             'W' => {
-                const s = try ByteClassTemplates.NonAlphaNumeric(p.allocator);
+                const s = try ByteClassTemplates.NonAlphaNumeric(p.arena.allocator());
                 const r = try p.createExpr();
                 r.* = Expr{ .ByteClass = s };
                 return r;
             },
             'd' => {
-                const s = try ByteClassTemplates.Digits(p.allocator);
+                const s = try ByteClassTemplates.Digits(p.arena.allocator());
                 const r = try p.createExpr();
                 r.* = Expr{ .ByteClass = s };
                 return r;
             },
             'D' => {
-                const s = try ByteClassTemplates.NonDigits(p.allocator);
+                const s = try ByteClassTemplates.NonDigits(p.arena.allocator());
                 const r = try p.createExpr();
                 r.* = Expr{ .ByteClass = s };
                 return r;
