@@ -105,19 +105,20 @@ pub fn RangeSet(comptime T: type) type {
         // The negation is performed in place.
         pub fn negate(self: *Self) !void {
             const ranges = &self.ranges;
-            // NOTE: Append to end of array then copy and shrink.
-            var negated = ArrayList(RangeType).init(self.ranges.allocator);
-            defer negated.deinit();
+            const ranges_end = self.ranges.items.len;
+
+            // The negated range is appended to the current list of ranges and then moved in
+            // place and capacity shrunk to avoid creating a temporary range set.
+            const negated = &self.ranges;
+            const negated_start = self.ranges.items.len;
 
             if (ranges.items.len == 0) {
-                try negated.append(RangeType.new(math.minInt(T), math.maxInt(T)));
-                ranges.clearRetainingCapacity();
-                try ranges.appendSlice(negated.items);
+                try ranges.append(RangeType.new(math.minInt(T), math.maxInt(T)));
                 return;
             }
 
             var low: T = math.minInt(T);
-            for (ranges.items) |r| {
+            for (ranges.items[0..ranges_end]) |r| {
                 // NOTE: Can only occur on first element.
                 if (r.min != math.minInt(T)) {
                     try negated.append(RangeType.new(low, r.min - 1));
@@ -127,13 +128,13 @@ pub fn RangeSet(comptime T: type) type {
             }
 
             // Highest segment will be remaining.
-            const lastRange = ranges.items[ranges.items.len - 1];
+            const lastRange = ranges.items[ranges_end - 1];
             if (lastRange.max != math.maxInt(T)) {
                 try negated.append(RangeType.new(low, math.maxInt(T)));
             }
 
-            ranges.clearRetainingCapacity();
-            try ranges.appendSlice(negated.items);
+            std.mem.copyForwards(RangeType, ranges.items, ranges.items[negated_start..]);
+            ranges.shrinkRetainingCapacity(negated.items.len - negated_start);
         }
 
         pub fn contains(self: Self, value: T) bool {
