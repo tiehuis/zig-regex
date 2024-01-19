@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: ['*']
+
+permissions:
+  contents: read
+
+jobs:
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.11.0  # most recent stable
+
+      - name: Check formatting
+        run: zig fmt --check .
+
+  test:
+    name: Test / Zig ${{ matrix.zig-version }}
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.allow-fail }}
+
+    strategy:
+      matrix:
+        zig-version: ['0.11.0']
+        os: [ubuntu-latest]
+        allow-fail: [false]
+        include:
+          # Test against Zig master but don't break from it.
+          # master is a constantly moving target,
+          # so we'll fix issues on a best-effort basis.
+          - zig-version: master
+            os: ubuntu-latest
+            allow-fail: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: ${{ matrix.zig-version }}
+
+      - name: Run tests
+        run: zig build test
