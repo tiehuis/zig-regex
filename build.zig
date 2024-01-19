@@ -1,12 +1,20 @@
-const Builder = @import("std").build.Builder;
+const std = @import("std");
 
-pub fn build(b: *Builder) void {
+pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    _ = b.addModule("regex", .{
-        .source_file = .{ .path = "src/regex.zig" },
-    });
+    if (@hasDecl(std.Build, "CreateModuleOptions")) {
+        // Zig 0.11
+        _ = b.addModule("regex", .{
+            .source_file = .{ .path = "src/regex.zig" },
+        });
+    } else {
+        // Zig 0.12-dev.2159
+        _ = b.addModule("regex", .{
+            .root_source_file = .{ .path = "src/regex.zig" },
+        });
+    }
 
     // library tests
     const library_tests = b.addTest(.{
