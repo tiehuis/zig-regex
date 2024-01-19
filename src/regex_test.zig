@@ -4,15 +4,11 @@ const Parser = @import("parse.zig").Parser;
 const re_debug = @import("debug.zig");
 
 const std = @import("std");
-const FixedBufferAllocator = std.heap.FixedBufferAllocator;
 const mem = std.mem;
 
-// Debug global allocator is too small for our tests
-var buffer: [800000]u8 = undefined;
-var fixed_allocator = FixedBufferAllocator.init(buffer[0..]);
-
 fn check(re_input: []const u8, to_match: []const u8, expected: bool) void {
-    var re = Regex.compile(fixed_allocator.allocator(), re_input) catch unreachable;
+    var re = Regex.compile(std.testing.allocator, re_input) catch unreachable;
+    defer re.deinit();
 
     if ((re.partialMatch(to_match) catch unreachable) != expected) {
         debug.print(
