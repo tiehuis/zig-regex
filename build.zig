@@ -12,13 +12,13 @@ pub fn build(b: *std.Build) void {
     } else {
         // Zig 0.12-dev.2159
         _ = b.addModule("regex", .{
-            .root_source_file = .{ .path = "src/regex.zig" },
+            .root_source_file = path(b, "src/regex.zig"),
         });
     }
 
     // library tests
     const library_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/all_test.zig" },
+        .root_source_file = path(b, "src/all_test.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -30,7 +30,7 @@ pub fn build(b: *std.Build) void {
     // C library
     const staticLib = b.addStaticLibrary(.{
         .name = "regex",
-        .root_source_file = .{ .path = "src/c_regex.zig" },
+        .root_source_file = path(b, "src/c_regex.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -40,7 +40,7 @@ pub fn build(b: *std.Build) void {
 
     const sharedLib = b.addSharedLibrary(.{
         .name = "regex",
-        .root_source_file = .{ .path = "src/c_regex.zig" },
+        .root_source_file = path(b, "src/c_regex.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -55,12 +55,10 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     c_example.addCSourceFile(.{
-        .file = .{
-            .path = "example/example.c",
-        },
+        .file = path(b, "example/example.c"),
         .flags = &.{"-Wall"},
     });
-    c_example.addIncludePath(.{ .path = "include" });
+    c_example.addIncludePath(path(b, "include"));
     c_example.linkLibC();
     c_example.linkLibrary(staticLib);
 
@@ -69,4 +67,13 @@ pub fn build(b: *std.Build) void {
     c_example_step.dependOn(&c_example.step);
 
     b.default_step.dependOn(test_step);
+}
+
+fn path(b: *std.Build, sub_path: []const u8) std.Build.LazyPath {
+    if (@hasDecl(std.Build, "path")) {
+        // Zig 0.13-dev.267
+        return b.path(sub_path);
+    } else {
+        return .{ .path = sub_path };
+    }
 }
