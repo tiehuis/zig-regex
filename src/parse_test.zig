@@ -84,7 +84,7 @@ fn reprIndent(out: *StaticWriter, e: *Expr, indent: usize) anyerror!void {
         },
         Expr.Capture => |subexpr| {
             try out.writer().print("cap\n", .{});
-            try reprIndent(out, subexpr, indent + 1);
+            try reprIndent(out, subexpr.*.expr, indent + 1);
         },
         Expr.Repeat => |repeat| {
             try out.writer().print("rep(", .{});

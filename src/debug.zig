@@ -56,7 +56,7 @@ fn dumpExprIndent(e: Expr, indent: usize) void {
         },
         Expr.Capture => |subexpr| {
             debug.print("{s}\n", .{@tagName(e)});
-            dumpExprIndent(subexpr.*, indent + 1);
+            dumpExprIndent(subexpr.*.expr.*, indent + 1);
         },
         Expr.Repeat => |repeat| {
             debug.print("{s}(min={d}, max={?d}, greedy={any})\n", .{ @tagName(e), repeat.min, repeat.max, repeat.greedy });

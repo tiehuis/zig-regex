@@ -356,7 +356,7 @@ pub const Compiler = struct {
                 const index = c.nextCaptureIndex();
 
                 try c.pushCompiled(Instruction.new(entry + 1, InstructionData{ .Save = index }));
-                const p = try c.compileInternal(subexpr);
+                const p = try c.compileInternal(subexpr.expr);
                 c.fillToNext(p.hole);
 
                 const h = try c.pushHole(InstHole{ .Save = index + 1 });

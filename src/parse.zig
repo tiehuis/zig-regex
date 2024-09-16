@@ -57,7 +57,7 @@ pub const Expr = union(enum) {
     // . character
     AnyCharNotNL,
     // Capture group
-    Capture: *Expr,
+    Capture: *Group,
     // *, +, ?
     Repeat: Repeater,
     // Character class [a-z0-9]
@@ -93,6 +93,13 @@ pub const Expr = union(enum) {
             .ByteClass => |*bc| bc.deinit(),
         }
     }
+};
+
+/// A single node of a group. The group could include different modifiers
+/// by Perl flag for further features like non-capturing group.
+pub const Group = struct {
+    expr: *Expr,
+    capturing: bool,
 };
 
 // Private in fmt.
@@ -326,6 +333,10 @@ pub const Parser = struct {
         return try p.arena.allocator().create(Expr);
     }
 
+    fn createGroup(p: *Parser) !*Group {
+        return try p.arena.allocator().create(Group);
+    }
+
     pub fn parse(p: *Parser, re: []const u8) !*Expr {
         p.it = StringIterator.init(re);
         // Shorter alias
@@ -438,8 +449,11 @@ pub const Parser = struct {
                                 // pop the left parentheses that must now exist
                                 debug.assert(p.stack.pop().* == Expr.PseudoLeftParen);
 
+                                const group = try p.createGroup();
+                                group.* = Group{ .expr = e, .capturing = true };
+
                                 const r = try p.createExpr();
-                                r.* = Expr{ .Capture = e };
+                                r.* = Expr{ .Capture = group };
                                 try p.stack.append(r);
                                 break;
                             },
@@ -458,8 +472,11 @@ pub const Parser = struct {
                                     ra.* = Expr{ .Concat = concat };
                                 }
 
+                                const group = try p.createGroup();
+                                group.* = Group{ .expr = ra, .capturing = true };
+
                                 const r = try p.createExpr();
-                                r.* = Expr{ .Capture = ra };
+                                r.* = Expr{ .Capture = group };
                                 try p.stack.append(r);
                                 break;
                             },
