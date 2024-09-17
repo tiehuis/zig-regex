@@ -141,6 +141,26 @@ test "regex captures" {
 
     debug.assert(mem.eql(u8, "ab0123", caps.sliceAt(0).?));
     debug.assert(mem.eql(u8, "0123", caps.sliceAt(1).?));
+
+    var r_non_capturing_1 = try Regex.compile(std.testing.allocator, "ab(?:\\d+)");
+    defer r_non_capturing_1.deinit();
+
+    debug.assert(try r_non_capturing_1.partialMatch("xxxxab0123a"));
+
+    var caps_non_capturing_1 = (try r_non_capturing_1.captures("xxxxab0123a")).?;
+    defer caps_non_capturing_1.deinit();
+
+    debug.assert(mem.eql(u8, "ab0123", caps_non_capturing_1.sliceAt(0).?));
+    debug.assert(caps_non_capturing_1.slots.len == 2);
+
+    var r_non_capturing_2 = try Regex.compile(std.testing.allocator, "(?:ab(cd))");
+    defer r_non_capturing_2.deinit();
+
+    var caps_non_capturing_2 = (try r_non_capturing_2.captures("xabcdx")).?;
+    defer caps_non_capturing_2.deinit();
+
+    debug.assert(mem.eql(u8, "abcd", caps_non_capturing_2.sliceAt(0).?));
+    debug.assert(mem.eql(u8, "cd", caps_non_capturing_2.sliceAt(1).?));
 }
 
 test "regex memory leaks" {
