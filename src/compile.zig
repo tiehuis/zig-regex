@@ -187,6 +187,8 @@ pub const Compiler = struct {
 
     fn nextCaptureIndex(c: *Compiler) usize {
         const s = c.capture_index;
+        // each capture contains start and end pos, hence add two for
+        // each iteration
         c.capture_index += 2;
         return s;
     }
@@ -350,13 +352,19 @@ pub const Compiler = struct {
                 // 3: restore 1, 4
                 // ...
 
+                if (!subexpr.capturing) {
+                    const p = try c.compileInternal(subexpr.expr);
+                    const hole = p.hole;
+                    return Patch{ .hole = hole, .entry = p.entry };
+                }
+
                 // Create a partial instruction with a hole outgoing at the current location.
                 const entry = c.insts.items.len;
 
                 const index = c.nextCaptureIndex();
 
                 try c.pushCompiled(Instruction.new(entry + 1, InstructionData{ .Save = index }));
-                const p = try c.compileInternal(subexpr);
+                const p = try c.compileInternal(subexpr.expr);
                 c.fillToNext(p.hole);
 
                 const h = try c.pushHole(InstHole{ .Save = index + 1 });

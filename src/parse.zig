@@ -48,6 +48,11 @@ pub const Assertion = enum {
     NotWordBoundaryAscii,
 };
 
+/// Extra attributes for group expression.
+pub const GroupAttributes = struct {
+    capturing: bool,
+};
+
 /// A single node of an expression tree.
 pub const Expr = union(enum) {
     // Empty match (\w assertion)
@@ -57,7 +62,7 @@ pub const Expr = union(enum) {
     // . character
     AnyCharNotNL,
     // Capture group
-    Capture: *Expr,
+    Capture: *Group,
     // *, +, ?
     Repeat: Repeater,
     // Character class [a-z0-9]
@@ -67,7 +72,7 @@ pub const Expr = union(enum) {
     // |
     Alternate: ArrayList(*Expr),
     // Pseudo stack operator to define start of a capture
-    PseudoLeftParen,
+    PseudoLeftParen: GroupAttributes,
 
     pub fn isByteClass(re: *const Expr) bool {
         switch (re.*) {
@@ -93,6 +98,13 @@ pub const Expr = union(enum) {
             .ByteClass => |*bc| bc.deinit(),
         }
     }
+};
+
+/// A single node of a group. The group could include different modifiers
+/// by Perl flag for further features like non-capturing group.
+pub const Group = struct {
+    expr: *Expr,
+    capturing: bool,
 };
 
 // Private in fmt.
@@ -243,6 +255,7 @@ pub const ParseError = error{
     InvalidHexDigit,
     InvalidOctalDigit,
     UnrecognizedEscapeCode,
+    UnimplementedModifier,
 };
 
 pub const ParserOptions = struct {
@@ -326,6 +339,10 @@ pub const Parser = struct {
         return try p.arena.allocator().create(Expr);
     }
 
+    fn createGroup(p: *Parser) !*Group {
+        return try p.arena.allocator().create(Group);
+    }
+
     pub fn parse(p: *Parser, re: []const u8) !*Expr {
         p.it = StringIterator.init(re);
         // Shorter alias
@@ -394,8 +411,24 @@ pub const Parser = struct {
                 // Don't handle alternation just yet, parentheses group together arguments into
                 // a sub-expression only.
                 '(' => {
+                    var capturing = true;
+                    if (it.peekIs('?')) {
+                        // Advance and discard
+                        _ = it.next();
+                        if (it.peekIs(':')) {
+                            // Advance and discard
+                            _ = it.next();
+                            capturing = false;
+                        } else {
+                            // NOTE: Other modifiers are considered not implemented
+                            return error.UnimplementedModifier;
+                        }
+                    }
+
                     const r = try p.createExpr();
-                    r.* = Expr{ .PseudoLeftParen = undefined };
+                    r.* = Expr{ .PseudoLeftParen = .{
+                        .capturing = capturing,
+                    } };
                     try p.stack.append(r);
                 },
                 ')' => {
@@ -435,16 +468,29 @@ pub const Parser = struct {
                                     return error.UnopenedParentheses;
                                 }
 
-                                // pop the left parentheses that must now exist
-                                debug.assert(p.stack.pop().* == Expr.PseudoLeftParen);
+                                const next_e = p.stack.pop().*;
+                                var capturing: bool = undefined;
+                                switch (next_e) {
+                                    // pop the left parentheses that must now exist
+                                    .PseudoLeftParen => |e_paren| {
+                                        capturing = e_paren.capturing;
+                                    },
+                                    else => unreachable,
+                                }
+
+                                const group = try p.createGroup();
+                                group.* = Group{
+                                    .expr = e,
+                                    .capturing = capturing,
+                                };
 
                                 const r = try p.createExpr();
-                                r.* = Expr{ .Capture = e };
+                                r.* = Expr{ .Capture = group };
                                 try p.stack.append(r);
                                 break;
                             },
                             // Existing parentheses, push new alternation
-                            .PseudoLeftParen => {
+                            .PseudoLeftParen => |e_paren| {
                                 mem.reverse(*Expr, concat.items);
 
                                 const ra = try p.createExpr();
@@ -458,8 +504,14 @@ pub const Parser = struct {
                                     ra.* = Expr{ .Concat = concat };
                                 }
 
+                                const group = try p.createGroup();
+                                group.* = Group{
+                                    .expr = ra,
+                                    .capturing = e_paren.capturing,
+                                };
+
                                 const r = try p.createExpr();
-                                r.* = Expr{ .Capture = ra };
+                                r.* = Expr{ .Capture = group };
                                 try p.stack.append(r);
                                 break;
                             },
