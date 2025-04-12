@@ -78,7 +78,7 @@ pub const VmBacktrack = struct {
         const t = Job{ .Thread = Thread{ .ip = prog_start, .input = input.clone() } };
         try state.jobs.append(t);
 
-        while (state.jobs.popOrNull()) |job| {
+        while (state.jobs.pop()) |job| {
             switch (job) {
                 Job.Thread => |thread| {
                     if (try step(&state, &thread)) {

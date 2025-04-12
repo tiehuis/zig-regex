@@ -85,7 +85,7 @@ pub const VmPike = struct {
         var matched: ?[]?usize = null;
 
         while (!input.isConsumed()) : (input.advance()) {
-            while (clist.popOrNull()) |thread| {
+            while (clist.pop()) |thread| {
                 const inst = prog.insts[thread.pc];
                 const at = input.current();
 
