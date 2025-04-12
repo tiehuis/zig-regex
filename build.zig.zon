@@ -1,6 +1,13 @@
 .{
-    .name = "regex",
+    .name = .regex,
     .version = "0.1.2",
-    .minimum_zig_version = "0.11.0",
-    .paths = .{""},
+    .minimum_zig_version = "0.14.0",
+    .paths = .{
+        "src",
+        "build.zig",
+        "build.zig.zon",
+        "LICENSE",
+        "README.md"
+    },
+    .fingerprint = 0x4204f8cae7b7106b,
 }
