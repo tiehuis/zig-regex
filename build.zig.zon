@@ -7,7 +7,7 @@
         "build.zig",
         "build.zig.zon",
         "LICENSE",
-        "README.md"
+        "README.md",
     },
     .fingerprint = 0x4204f8cae7b7106b,
 }
