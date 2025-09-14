@@ -6,7 +6,7 @@ const InputBytes = @import("input.zig").InputBytes;
 const re_debug = @import("debug.zig");
 
 const std = @import("std");
-const ArrayList = std.ArrayList;
+const ArrayList = std.array_list.Managed;
 const FixedBufferAllocator = std.heap.FixedBufferAllocator;
 const mem = std.mem;
 
