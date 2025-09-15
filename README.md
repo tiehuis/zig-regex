@@ -8,6 +8,9 @@ Note: This is still a work in progress and many things still need to be done.
  - [x] Add a PikeVM implementation
  - [ ] Literal optimizations and just general performance improvements.
 
+Supports Zig 0.15.1. If possible, will attempt to support earlier versions if
+the changes needed are limited.
+
 ## Usage
 
 ```zig

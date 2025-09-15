@@ -8,132 +8,96 @@ const Parser = parse.Parser;
 const Expr = parse.Expr;
 const ParseError = parse.ParseError;
 
-// Note: Switch to OutStream
 var global_buffer: [2048]u8 = undefined;
-
-const StaticWriter = struct {
-    buffer: []u8,
-    last: usize,
-
-    pub fn init(buffer: []u8) StaticWriter {
-        return StaticWriter{
-            .buffer = buffer,
-            .last = 0,
-        };
-    }
-
-    pub fn writeFn(self: *StaticWriter, bytes: []const u8) Error!usize {
-        @memcpy(self.buffer[self.last..][0..bytes.len], bytes);
-        self.last += bytes.len;
-        return bytes.len;
-    }
-
-    pub const Error = error{OutOfMemory};
-    pub const Writer = std.io.Writer(*StaticWriter, Error, writeFn);
-
-    pub fn writer(self: *StaticWriter) Writer {
-        return .{ .context = self };
-    }
-
-    pub fn printCharEscaped(self: *StaticWriter, ch: u8) !void {
-        switch (ch) {
-            '\t' => {
-                try self.writer().print("\\t", .{});
-            },
-            '\r' => {
-                try self.writer().print("\\r", .{});
-            },
-            '\n' => {
-                try self.writer().print("\\n", .{});
-            },
-            // printable characters
-            32...126 => {
-                try self.writer().print("{c}", .{ch});
-            },
-            else => {
-                try self.writer().print("0x{x}", .{ch});
-            },
-        }
-    }
-};
 
 // Return a minimal string representation of the expression tree.
 fn repr(e: *Expr) ![]u8 {
-    var stream = StaticWriter.init(global_buffer[0..]);
-    try reprIndent(&stream, e, 0);
-    return global_buffer[0..stream.last];
+    var w: std.Io.Writer = .fixed(&global_buffer);
+    try reprIndent(&w, e, 0);
+    try w.flush();
+    return global_buffer[0..w.end];
 }
 
-fn reprIndent(out: *StaticWriter, e: *Expr, indent: usize) anyerror!void {
+fn printCharEscaped(w: *std.Io.Writer, ch: u8) !void {
+    switch (ch) {
+        '\t' => try w.print("\\t", .{}),
+        '\r' => try w.print("\\r", .{}),
+        '\n' => try w.print("\\n", .{}),
+        32...126 => try w.print("{c}", .{ch}),
+        else => try w.print("0x{x}", .{ch}),
+    }
+}
+
+fn reprIndent(w: *std.Io.Writer, e: *Expr, indent: usize) !void {
     var i: usize = 0;
     while (i < indent) : (i += 1) {
-        try out.writer().print(" ", .{});
+        try w.print(" ", .{});
     }
 
     switch (e.*) {
         Expr.AnyCharNotNL => {
-            try out.writer().print("dot\n", .{});
+            try w.print("dot\n", .{});
         },
         Expr.EmptyMatch => |assertion| {
-            try out.writer().print("empty({s})\n", .{@tagName(assertion)});
+            try w.print("empty({s})\n", .{@tagName(assertion)});
         },
         Expr.Literal => |lit| {
-            try out.writer().print("lit(", .{});
-            try out.printCharEscaped(lit);
-            try out.writer().print(")\n", .{});
+            try w.print("lit(", .{});
+            try printCharEscaped(w, lit);
+            try w.print(")\n", .{});
         },
         Expr.Capture => |subexpr| {
-            try out.writer().print("cap\n", .{});
-            try reprIndent(out, subexpr, indent + 1);
+            try w.print("cap\n", .{});
+            try reprIndent(w, subexpr, indent + 1);
         },
         Expr.Repeat => |repeat| {
-            try out.writer().print("rep(", .{});
+            try w.print("rep(", .{});
             if (repeat.min == 0 and repeat.max == null) {
-                try out.writer().print("*", .{});
+                try w.print("*", .{});
             } else if (repeat.min == 1 and repeat.max == null) {
-                try out.writer().print("+", .{});
+                try w.print("+", .{});
             } else if (repeat.min == 0 and repeat.max != null and repeat.max.? == 1) {
-                try out.writer().print("?", .{});
+                try w.print("?", .{});
             } else {
-                try out.writer().print("{{{d},", .{repeat.min});
+                try w.print("{{{d},", .{repeat.min});
                 if (repeat.max) |ok| {
-                    try out.writer().print("{d}", .{ok});
+                    try w.print("{d}", .{ok});
                 }
-                try out.writer().print("}}", .{});
+                try w.print("}}", .{});
             }
 
             if (!repeat.greedy) {
-                try out.writer().print("?", .{});
+                try w.print("?", .{});
             }
-            try out.writer().print(")\n", .{});
+            try w.print(")\n", .{});
 
-            try reprIndent(out, repeat.subexpr, indent + 1);
+            try reprIndent(w, repeat.subexpr, indent + 1);
         },
         Expr.ByteClass => |class| {
-            try out.writer().print("bset(", .{});
+            try w.print("bset(", .{});
             for (class.ranges.items) |r| {
-                try out.writer().print("[", .{});
-                try out.printCharEscaped(r.min);
-                try out.writer().print("-", .{});
-                try out.printCharEscaped(r.max);
-                try out.writer().print("]", .{});
+                try w.print("[", .{});
+                try printCharEscaped(w, r.min);
+                try w.print("-", .{});
+                try printCharEscaped(w, r.max);
+                try w.print("]", .{});
             }
-            try out.writer().print(")\n", .{});
+            try w.print(")\n", .{});
         },
         // TODO: Can we get better type unification on enum variants with the same type?
         Expr.Concat => |subexprs| {
-            try out.writer().print("cat\n", .{});
+            try w.print("cat\n", .{});
             for (subexprs.items) |s|
-                try reprIndent(out, s, indent + 1);
+                try reprIndent(w, s, indent + 1);
         },
         Expr.Alternate => |subexprs| {
-            try out.writer().print("alt\n", .{});
+            try w.print("alt\n", .{});
             for (subexprs.items) |s|
-                try reprIndent(out, s, indent + 1);
+                try reprIndent(w, s, indent + 1);
         },
         // NOTE: Shouldn't occur ever in returned output.
         Expr.PseudoLeftParen => {
-            try out.writer().print("{s}\n", .{@tagName(e.*)});
+            try w.print("{s}\n", .{@tagName(e.*)});
         },
     }
 }
