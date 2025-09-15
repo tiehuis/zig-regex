@@ -6,7 +6,7 @@ const mem = std.mem;
 const fmt = std.fmt;
 const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
-const ArrayList = std.ArrayList;
+const ArrayList = std.array_list.Managed;
 const debug = std.debug;
 
 const range_set = @import("range_set.zig");

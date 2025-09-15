@@ -18,9 +18,11 @@ pub fn build(b: *std.Build) void {
 
     // library tests
     const library_tests = b.addTest(.{
-        .root_source_file = path(b, "src/all_test.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = path(b, "src/all_test.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     const run_library_tests = b.addRunArtifact(library_tests);
 
@@ -28,21 +30,27 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_library_tests.step);
 
     // C library
-    const staticLib = b.addStaticLibrary(.{
+    const staticLib = b.addLibrary(.{
         .name = "regex",
-        .root_source_file = path(b, "src/c_regex.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = path(b, "src/c_regex.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+        .linkage = .static,
     });
     staticLib.linkLibC();
 
     b.installArtifact(staticLib);
 
-    const sharedLib = b.addSharedLibrary(.{
+    const sharedLib = b.addLibrary(.{
         .name = "regex",
-        .root_source_file = path(b, "src/c_regex.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = path(b, "src/c_regex.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+        .linkage = .dynamic,
     });
     sharedLib.linkLibC();
 
@@ -51,8 +59,10 @@ pub fn build(b: *std.Build) void {
     // C example
     const c_example = b.addExecutable(.{
         .name = "example",
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     c_example.addCSourceFile(.{
         .file = path(b, "example/example.c"),

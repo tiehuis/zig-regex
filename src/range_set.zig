@@ -8,7 +8,7 @@ const debug = std.debug;
 const mem = std.mem;
 const math = std.math;
 const Allocator = std.mem.Allocator;
-const ArrayList = std.ArrayList;
+const ArrayList = std.array_list.Managed;
 
 // A single inclusive range (a, b) and a <= b
 pub fn Range(comptime T: type) type {

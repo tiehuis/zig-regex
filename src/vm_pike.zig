@@ -9,7 +9,7 @@ const std = @import("std");
 const mem = std.mem;
 const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
-const ArrayList = std.ArrayList;
+const ArrayList = std.array_list.Managed;
 
 const parse = @import("parse.zig");
 const compile = @import("compile.zig");
