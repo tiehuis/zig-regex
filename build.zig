@@ -36,10 +36,10 @@ pub fn build(b: *std.Build) void {
             .root_source_file = path(b, "src/c_regex.zig"),
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
         }),
         .linkage = .static,
     });
-    staticLib.linkLibC();
 
     b.installArtifact(staticLib);
 
@@ -49,28 +49,29 @@ pub fn build(b: *std.Build) void {
             .root_source_file = path(b, "src/c_regex.zig"),
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
         }),
         .linkage = .dynamic,
     });
-    sharedLib.linkLibC();
 
     b.installArtifact(sharedLib);
 
     // C example
+    const c_example_module = b.createModule(.{
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
     const c_example = b.addExecutable(.{
         .name = "example",
-        .root_module = b.createModule(.{
-            .target = target,
-            .optimize = optimize,
-        }),
+        .root_module = c_example_module,
     });
-    c_example.addCSourceFile(.{
+    c_example.root_module.addCSourceFile(.{
         .file = path(b, "example/example.c"),
         .flags = &.{"-Wall"},
     });
-    c_example.addIncludePath(path(b, "include"));
-    c_example.linkLibC();
-    c_example.linkLibrary(staticLib);
+    c_example.root_module.addIncludePath(path(b, "include"));
+    c_example.root_module.linkLibrary(staticLib);
 
     const c_example_step = b.step("c-example", "Example using C API");
     c_example_step.dependOn(&staticLib.step);
