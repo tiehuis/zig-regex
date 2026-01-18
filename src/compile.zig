@@ -217,7 +217,7 @@ pub const Compiler = struct {
                 PartialInst.Compiled => |x| {
                     try p.append(x);
                 },
-                else => |_| {
+                else => {
                     @panic("uncompiled instruction encountered during compilation");
                 },
             }
