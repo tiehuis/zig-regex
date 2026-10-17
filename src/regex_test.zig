@@ -2,6 +2,8 @@ const Regex = @import("regex.zig").Regex;
 const debug = @import("std").debug;
 const Parser = @import("parse.zig").Parser;
 const re_debug = @import("debug.zig");
+const Math = @import("std").math;
+
 
 const std = @import("std");
 const mem = std.mem;
@@ -128,6 +130,76 @@ test "regex sanity tests" {
     check("\\Bx\\B", " x ", false);
     check("\\Bx", "Ax", true);
     check("x\\B", "xA", true);
+}
+
+test "match string in the middle example" {
+    var re = try Regex.compile(std.heap.page_allocator, "ab(\\d+)");
+    defer re.deinit();
+
+    const compute_str = "xxxxab0123a";
+
+    if (try re.captures(compute_str)) |caps| {
+
+        const whole_match = caps.sliceAt(0).?; // "ab0123"
+        const digits = caps.sliceAt(1).?;      // "0123"
+        debug.print("whole match: {s}\n", .{ whole_match });
+        debug.print("digits: {s}\n", .{ digits });
+    }
+}
+
+test "gate example" {
+ 
+    const Gates = struct {
+        const Gate = enum { sine, cosine, add, multiply, subtract, divide };
+        const Self = @This();
+
+        fn fromString(name: []const u8) ?Gate {
+            return std.meta.stringToEnum(Gate, name);
+        }
+        fn sine(angle: f64) f64 {
+            return Math.sin(angle);
+        }
+        fn cosine(angle: f64) f64 {
+            return Math.cos(angle);
+        }
+        fn add(a: f64, b: f64) f64 {
+            return a + b;
+        }
+        fn multiply(a: f64, b: f64) f64 {
+            return a * b;
+        }
+        fn subtract(a: f64, b: f64) f64 {
+            return a - b;
+        }
+        fn divide(a: f64, b: f64) f64 {
+            return a / b;
+        }
+
+        fn compute(gate: Gate, args: []const f64) error{InvalidArgumentCount}!f64 {
+            return switch (gate) {
+                .sine => if (args.len == 1) Self.sine(args[0]) else error.InvalidArgumentCount,
+                .cosine => if (args.len == 1) Self.cosine(args[0]) else error.InvalidArgumentCount,
+                .add => if (args.len == 2) Self.add(args[0], args[1]) else error.InvalidArgumentCount,
+                .multiply => if (args.len == 2) Self.multiply(args[0], args[1]) else error.InvalidArgumentCount,
+                .subtract => if (args.len == 2) Self.subtract(args[0], args[1]) else error.InvalidArgumentCount,
+                .divide => if (args.len == 2) Self.divide(args[0], args[1]) else error.InvalidArgumentCount,
+            };
+        }
+    };
+
+    const re = try Regex.compile(std.heap.page_allocator, "%-  (\\w+)  (\\d+\\.?\\d*)");
+    const compute_str = "%-  sine  1.0";
+
+    if (try re.captures(compute_str)) |caps| {
+        const whole_match_gate = caps.sliceAt(1).?;
+        const digits = caps.sliceAt(2).?;
+        const GateString = Gates.fromString(whole_match_gate) orelse @panic("Invalid gate name");
+
+        debug.print("whole match gate: {s}\n", .{ whole_match_gate });
+        debug.print("digit: {s}\n", .{ digits });
+
+        debug.print("computed: {d}\n", .{ try Gates.compute(GateString, &.{try std.fmt.parseFloat(f64, digits)}) });
+    }
 }
 
 test "regex captures" {
