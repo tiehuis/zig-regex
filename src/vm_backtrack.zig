@@ -69,7 +69,7 @@ pub const VmBacktrack = struct {
 
         var state = ExecState{
             .jobs = ArrayList(Job).init(self.allocator),
-            .visited = [_]u32{0} ** 512,
+            .visited = @splat(0),
             .prog = &prog,
             .slots = slots,
         };
